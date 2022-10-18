@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+
+    <AssemblyName>Hl7.Fhir.R4B.MappingLanguage</AssemblyName>
+    <PackageId>brianpos.Fhir.R4B.MappingLanguage</PackageId>
+    <Version>4.3.0-beta1</Version>
+    <Title>HL7 Fhir Mapping Language Engine</Title>
+    <Summary>HL7 Fhir Mapping Language Engine ported from the Java code</Summary>
+    <Description>Includes a serializer, parser and execution engine</Description>
+    <PackageTags>HL7;FHIR;FML;FhirPath</PackageTags>
+    <Product>Hl7.Fhir.R4B.MappingLanguage</Product>
+    <RootNamespace>Hl7.Fhir.MappingLanguage</RootNamespace>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.1" />
+    <PackageReference Include="Hl7.Fhir.R4B" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>
