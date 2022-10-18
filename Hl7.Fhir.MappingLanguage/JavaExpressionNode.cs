@@ -136,7 +136,7 @@ namespace Hl7.Fhir.MappingLanguage
 
             return null;
         }
-        public static String toCode(Function value)
+        public static String toCode(Function? value)
         {
             switch (value)
             {
@@ -301,7 +301,7 @@ namespace Hl7.Fhir.MappingLanguage
         private Kind kind;
         private String name;
         private Base constant;
-        private Function function;
+        private Function? function;
         private List<ExpressionNode> parameters; // will be created if there is a function
         private ExpressionNode inner;
         private ExpressionNode group;
@@ -426,7 +426,7 @@ namespace Hl7.Fhir.MappingLanguage
             this.constant = constant;
         }
 
-        public Function getFunction()
+        public Function? getFunction()
         {
             return function;
         }
