@@ -196,14 +196,14 @@ namespace Hl7.Fhir.MappingLanguage
                     cursor++;
                     if (cursor < source.Length && (source[cursor] == '=' || source[cursor] == '~' || source[cursor] == '-') || (ch == '-' && source[cursor] == '>'))
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '.')
                 {
                     cursor++;
                     if (cursor < source.Length && (source[cursor] == '.'))
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch >= '0' && ch <= '9')
                 {
@@ -217,14 +217,14 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     if (source[cursor - 1] == '.')
                         cursor--;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
                 {
                     while (cursor < source.Length && ((source[cursor] >= 'A' && source[cursor] <= 'Z') || (source[cursor] >= 'a' && source[cursor] <= 'z') ||
                         (source[cursor] >= '0' && source[cursor] <= '9') || source[cursor] == '_'))
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '%')
                 {
@@ -240,7 +240,7 @@ namespace Hl7.Fhir.MappingLanguage
                         while (cursor < source.Length && ((source[cursor] >= 'A' && source[cursor] <= 'Z') || (source[cursor] >= 'a' && source[cursor] <= 'z') ||
                             (source[cursor] >= '0' && source[cursor] <= '9') || source[cursor] == ':' || source[cursor] == '-'))
                             cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '/')
                 {
@@ -250,14 +250,14 @@ namespace Hl7.Fhir.MappingLanguage
                         // this is en error - should already have been skipped
                         error("This shoudn't happen?");
                     }
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '$')
                 {
                     cursor++;
                     while (cursor < source.Length && (source[cursor] >= 'a' && source[cursor] <= 'z'))
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '{')
                 {
@@ -265,7 +265,7 @@ namespace Hl7.Fhir.MappingLanguage
                     ch = source[cursor];
                     if (ch == '}')
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else if (ch == '"')
                 {
@@ -282,7 +282,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (cursor == source.Length)
                         throw error("Unterminated string");
                     cursor++;
-                    current = "\"" + source.Substring(currentStart + 1, cursor - 1) + "\"";
+                    current = "\"" + source.Substring(currentStart + 1, cursor - 2 - currentStart) + "\"";
                 }
                 else if (ch == '`')
                 {
@@ -299,7 +299,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (cursor == source.Length)
                         throw error("Unterminated string");
                     cursor++;
-                    current = "`" + source.Substring(currentStart + 1, cursor - 1) + "`";
+                    current = "`" + source.Substring(currentStart + 1, cursor - 2 - currentStart) + "`";
                 }
                 else if (ch == '\'')
                 {
@@ -317,9 +317,9 @@ namespace Hl7.Fhir.MappingLanguage
                     if (cursor == source.Length)
                         throw error("Unterminated string");
                     cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                     if (ech == '\'')
-                        current = "\'" + current.Substring(1, current.Length - 1) + "\'";
+                        current = "\'" + current.Substring(1, current.Length - 2) + "\'";
                 }
                 else if (ch == '`')
                 {
@@ -336,7 +336,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (cursor == source.Length)
                         throw error("Unterminated string");
                     cursor++;
-                    current = "`" + source.Substring(currentStart + 1, cursor - 1) + "`";
+                    current = "`" + source.Substring(currentStart + 1, cursor - 2 - currentStart) + "`";
                 }
                 else if (ch == '@')
                 {
@@ -344,12 +344,12 @@ namespace Hl7.Fhir.MappingLanguage
                     cursor++;
                     while (cursor < source.Length && isDateChar(source[cursor], start))
                         cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
                 else
                 { // if CharInSet(ch, ['.', ',', '(', ')', '=', '$']) then
                     cursor++;
-                    current = source.Substring(currentStart, cursor);
+                    current = source.Substring(currentStart, cursor - currentStart);
                 }
             }
         }
@@ -361,14 +361,14 @@ namespace Hl7.Fhir.MappingLanguage
             bool done = false;
             while (cursor < source.Length && !done)
             {
-                if (cursor < source.Length - 1 && "//".Equals(source.Substring(cursor, cursor + 2)))
+                if (cursor < source.Length - 1 && "//".Equals(source.Substring(cursor, 2)))
                 {
                     while (cursor < source.Length && !((source[cursor] == '\r') || source[cursor] == '\n'))
                         cursor++;
                 }
-                else if (cursor < source.Length - 1 && "/*".Equals(source.Substring(cursor, cursor + 2)))
+                else if (cursor < source.Length - 1 && "/*".Equals(source.Substring(cursor, 2)))
                 {
-                    while (cursor < source.Length - 1 && !"*/".Equals(source.Substring(cursor, cursor + 2)))
+                    while (cursor < source.Length - 1 && !"*/".Equals(source.Substring(cursor, 2)))
                     {
                         last13 = currentLocation.checkChar(source[cursor], last13);
                         cursor++;
@@ -511,7 +511,7 @@ namespace Hl7.Fhir.MappingLanguage
                             break;
                         case 'u':
                             i++;
-                            int uc = int.Parse(s.Substring(i, i + 4), NumberStyles.HexNumber);
+                            int uc = int.Parse(s.Substring(i, 4), NumberStyles.HexNumber);
                             b.Append((char)uc);
                             i = i + 4;
                             break;
@@ -566,7 +566,7 @@ namespace Hl7.Fhir.MappingLanguage
                             break;
                         case 'u':
                             i++;
-                            int uc = int.Parse(s.Substring(i, i + 4), NumberStyles.HexNumber);
+                            int uc = int.Parse(s.Substring(i, 4), NumberStyles.HexNumber);
                             b.Append((char)uc);
                             i = i + 4;
                             break;
