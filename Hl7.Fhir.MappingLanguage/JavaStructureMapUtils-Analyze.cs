@@ -2366,8 +2366,8 @@ namespace Hl7.Fhir.MappingLanguage
 
                 ////case DATEOP :
                 ////  throw new Exception("Transform "+tgt.Transform.toCode()+" not supported yet");
-                ////case UUID :
-                ////  return new Id(UUID.randomUUID().ToString());
+                case StructureMap.StructureMapTransform.Uuid:
+                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, new TypeDetails.ProfiledType(FP_String));
                 ////case POINTER :
                 ////  Base b = getParam(vars, tgt.Parameter.First());
                 ////  if (b is Resource)
@@ -2477,7 +2477,8 @@ namespace Hl7.Fhir.MappingLanguage
                     StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
                     if (sd == null)
                         throw new FHIRException("Import " + imp.Url + " cannot be resolved");
-                    if (sd.Id.Equals(type))
+                    // TODO: BRIAN Verify why this if test exists (doesn't make any sense)
+                    // if (sd.Id.Equals(type))
                     {
                         return new PropertyWithType(sd.Type, new Property(worker, sd.Snapshot.Element.First(), sd), null, new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, sd.Url));
                     }
