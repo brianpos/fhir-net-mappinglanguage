@@ -171,7 +171,8 @@ namespace Hl7.Fhir.MappingLanguage
                         b.Append("\"");
                     }
                     b.Append(" ");
-                    b.Append(ce.getTargetFirstRep().Equivalence.GetLiteral());
+                    var e = ce.getTargetFirstRep().Equivalence;
+                    b.Append(e.HasValue ? getChar(e.Value) : "??");
                     b.Append(" ");
                     b.Append(prefixesTgt[cg.Target]);
                     b.Append(":");
@@ -702,6 +703,7 @@ namespace Hl7.Fhir.MappingLanguage
                 string v = lexer.take();
                 if (v.Equals("provided"))
                 {
+                    if (g.Unmapped == null) g.Unmapped = new ConceptMap.UnmappedComponent();
                     g.Unmapped.Mode = ConceptMap.ConceptMapGroupUnmappedMode.Provided;
                 }
                 else
