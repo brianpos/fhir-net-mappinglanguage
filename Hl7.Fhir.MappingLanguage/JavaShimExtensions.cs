@@ -35,6 +35,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Xml;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.Model.ElementDefinition;
 
@@ -54,6 +55,52 @@ namespace Hl7.Fhir.MappingLanguage
             if (_sb.Length > 0)
                 _sb.Append(",");
             _sb.Append(value);
+        }
+    }
+
+    public enum NodeType
+    {
+        Element
+    };
+    public class XhtmlNode
+    {
+        XmlDocument _document;
+        XmlNode _node;
+        public XhtmlNode(NodeType nodeType, string value)
+        {
+            this.nodeType = nodeType;
+            this.value = value;
+            if (nodeType == NodeType.Element)
+            {
+                _document = new XmlDocument();
+                _node = _document.CreateElement(value);
+            }
+        }
+
+        public NodeType nodeType { get; }
+        public string value { get; }
+
+        private XhtmlNode(XmlDocument parent, XmlNode node)
+        {
+            _document = parent;
+            _node = node;
+        }
+        internal XhtmlNode addTag(string v)
+        {
+            return new XhtmlNode(_document, _node.AppendChild(_document.CreateElement(v)));
+        }
+
+        internal void addText(string v)
+        {
+            _node.InnerText += v;
+        }
+
+        internal XhtmlNode setAttribute(string v1, string v2)
+        {
+            var attr = _document.CreateAttribute(v1);
+            attr.Value = v2;
+            _node.Attributes.SetNamedItem(attr);
+            return this;
         }
     }
 
