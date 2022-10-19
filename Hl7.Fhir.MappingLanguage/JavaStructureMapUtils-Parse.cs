@@ -28,7 +28,7 @@
 */
 
 // Port from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/StructureMapUtilities.java
-
+// (the parse/serialize portions)
 
 // remember group resolution
 // trace - account for which wasn't transformed in the source
@@ -111,9 +111,9 @@ namespace Hl7.Fhir.MappingLanguage
 
         private static void produceConceptMap(StringBuilder b, ConceptMap cm)
         {
-            b.Append("conceptmap \"");
+            b.Append("conceptmap '");
             b.Append(cm.Id);
-            b.Append("\" {\r\n");
+            b.Append("' {\r\n");
             Dictionary<string, string> prefixesSrc = new Dictionary<string, string>();
             Dictionary<string, string> prefixesTgt = new Dictionary<string, string>();
             char prefix = 's';
@@ -124,9 +124,9 @@ namespace Hl7.Fhir.MappingLanguage
                     prefixesSrc.Add(cg.Source, prefix.ToString());
                     b.Append("  prefix ");
                     b.Append(prefix);
-                    b.Append(" = \"");
+                    b.Append(" = '");
                     b.Append(cg.Source);
-                    b.Append("\"\r\n");
+                    b.Append("'\r\n");
                     prefix++;
                 }
                 if (!prefixesTgt.ContainsKey(cg.Target))
@@ -134,9 +134,9 @@ namespace Hl7.Fhir.MappingLanguage
                     prefixesTgt.Add(cg.Target, prefix.ToString());
                     b.Append("  prefix ");
                     b.Append(prefix);
-                    b.Append(" = \"");
+                    b.Append(" = '");
                     b.Append(cg.Target);
-                    b.Append("\"\r\n");
+                    b.Append("'\r\n");
                     prefix++;
                 }
             }
@@ -166,9 +166,9 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     else
                     {
-                        b.Append("\"");
+                        b.Append("'");
                         b.Append(ce.Code);
-                        b.Append("\"");
+                        b.Append("'");
                     }
                     b.Append(" ");
                     b.Append(ce.getTargetFirstRep().Equivalence.GetLiteral());
@@ -181,9 +181,9 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     else
                     {
-                        b.Append("\"");
+                        b.Append("'");
                         b.Append(ce.getTargetFirstRep().Code);
-                        b.Append("\"");
+                        b.Append("'");
                     }
                     b.AppendLine();
                 }
@@ -389,9 +389,9 @@ namespace Hl7.Fhir.MappingLanguage
             }
             if (!string.IsNullOrEmpty(r.Name))
             {
-                string n = ntail(r.Name);
-                if (!n.StartsWith("\""))
-                    n = "\"" + n + "\"";
+                string n = r.Name; // ntail(r.Name);
+                if (!n.StartsWith("'"))
+                    n = "'" + n + "'";
                 if (!matchesName(n, r.Source))
                 {
                     b.Append(" ");
@@ -411,12 +411,12 @@ namespace Hl7.Fhir.MappingLanguage
             string s = src.Element;
             if (string.IsNullOrEmpty(s))
                 return false;
-            if (n.Equals(s) || n.Equals("\"" + s + "\""))
+            if (n.Equals(s) || n.Equals("'" + s + "'"))
                 return true;
             if (!string.IsNullOrEmpty(src.Type))
             {
                 s = s + "-" + src.Type;
-                if (n.Equals(s) || n.Equals("\"" + s + "\""))
+                if (n.Equals(s) || n.Equals("'" + s + "'"))
                     return true;
             }
             return false;
@@ -426,12 +426,12 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (name == null)
                 return null;
-            if (name.StartsWith("\""))
+            if (name.StartsWith("'"))
             {
                 name = name.Substring(1);
                 name = name.Substring(0, name.Length - 1);
             }
-            return "\"" + (name.Contains(".") ? name.Substring(name.LastIndexOf(".") + 1) : name) + "\"";
+            return "'" + (name.Contains(".") ? name.Substring(name.LastIndexOf(".") + 1) : name) + "'";
         }
 
         private static bool checkisSimple(StructureMap.RuleComponent r)
@@ -486,7 +486,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 b.Append(" default ");
                 // assert rs.getDefaultValue() is StringType;
-                b.Append("\"" + Utilities.escapeJson(rs.DefaultValue.ToString()) + "\"");
+                b.Append("'" + Utilities.escapeJson(rs.DefaultValue.ToString()) + "'");
             }
             if (!abbreviate && !string.IsNullOrEmpty(rs.Variable))
             {
@@ -541,15 +541,17 @@ namespace Hl7.Fhir.MappingLanguage
                 else if (rt.Transform == StructureMap.StructureMapTransform.Evaluate && rt.Parameter.Count() == 1)
                 {
                     b.Append("(");
-                    b.Append("\"" + ((StringType)rt.Parameter.First().Value).asStringValue() + "\"");
+                    // TODO: BRIAN chasing up if this requires quotes or not
+                    // b.Append("'" + ((FhirString)rt.Parameter.First().Value).ToString() + "'");
+                    b.Append(((FhirString)rt.Parameter.First().Value).ToString());
                     b.Append(")");
                 }
                 else if (rt.Transform == StructureMap.StructureMapTransform.Evaluate && rt.Parameter.Count() == 2)
                 {
                     b.Append(rt.Transform.GetLiteral());
                     b.Append("(");
-                    b.Append(((IdType)rt.Parameter.First().Value).asStringValue());
-                    b.Append("\"" + ((StringType)rt.Parameter[1].Value).asStringValue() + "\"");
+                    b.Append(((Id)rt.Parameter.First().Value).ToString());
+                    b.Append("'" + ((FhirString)rt.Parameter[1].Value).ToString() + "'");
                     b.Append(")");
                 }
                 else

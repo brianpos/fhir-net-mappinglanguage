@@ -28,20 +28,20 @@
 */
 
 // Port from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/StructureMapUtilities.java
-// (The Analyze portions)
+// (The Execution portions)
 
 // remember group resolution
 // trace - account for which wasn't transformed in the source
 
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
+using static Hl7.Fhir.Model.StructureMap;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
-using static Hl7.Fhir.MappingLanguage.TypeDetails;
 
 namespace Hl7.Fhir.MappingLanguage
 {
@@ -58,7 +58,7 @@ namespace Hl7.Fhir.MappingLanguage
      * @author Grahame Grieve
      *
      */
-    public class StructureMapUtilitiesAnalyze
+    public partial class StructureMapUtilitiesExecute
     {
         public class ResolvedGroup
         {
@@ -92,6 +92,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private class FFHIRPathHostServices : IEvaluationContext
         {
+
             public List<Base> resolveConstant(Object appContext, string name, bool beforeContext)
             {
                 Variables vars = (Variables)appContext;
@@ -123,7 +124,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
 
             // @Override
-            public FHIRPathEngineOriginal.FunctionDetails resolveFunction(string functionName)
+            public FunctionDetails resolveFunction(string functionName)
             {
                 return null; // throw new Exception("Not Implemented Yet");
             }
@@ -143,27 +144,24 @@ namespace Hl7.Fhir.MappingLanguage
             // @Override
             public Base resolveReference(Object appContext, string url)
             {
-                // TODO: BRIAN wire in the Firely Resolver (is the a resource or canonical resolve?)
-                throw new NotImplementedException("Not done yet (FFHIRPathHostServices.conformsToProfile), when item is element");
-                //if (services == null)
-                //    return null;
-                //return services.resolveReference(appContext, url);
+                if (services == null)
+                    return null;
+                return services.resolveReference(appContext, url);
             }
 
             // @Override
             public bool conformsToProfile(Object appContext, Base item, string url)
             {
-                // TODO: BRIAN wire in the Firely Validator
-                //IResourceValidator val = worker.newValidator();
-                //List<ValidationMessage> valerrors = new List<ValidationMessage>();
-                //if (item is Resource)
-                //{
-                //    val.validate(appContext, valerrors, (Resource)item, url);
-                //    bool ok = true;
-                //    foreach (ValidationMessage v in valerrors)
-                //        ok = ok && v.getLevel().isError();
-                //    return ok;
-                //}
+                IResourceValidator val = worker.newValidator();
+                List<ValidationMessage> valerrors = new List<ValidationMessage>();
+                if (item is Resource)
+                {
+                    val.validate(appContext, valerrors, (Resource)item, url);
+                    bool ok = true;
+                    foreach (ValidationMessage v in valerrors)
+                        ok = ok && v.getLevel().isError();
+                    return ok;
+                }
                 throw new NotImplementedException("Not done yet (FFHIRPathHostServices.conformsToProfile), when item is element");
             }
 
@@ -181,7 +179,7 @@ namespace Hl7.Fhir.MappingLanguage
         private Dictionary<string, int> ids = new Dictionary<string, int>();
         private TerminologyServiceOptions terminologyServiceOptions = new TerminologyServiceOptions();
 
-        public StructureMapUtilitiesAnalyze(IWorkerContext worker, ITransformerServices services, ProfileKnowledgeProvider pkp)
+        public StructureMapUtilitiesExecute(IWorkerContext worker, ITransformerServices services, ProfileKnowledgeProvider pkp)
         {
             this.worker = worker;
             this.services = services;
@@ -190,7 +188,7 @@ namespace Hl7.Fhir.MappingLanguage
             fpe.setHostServices(new FFHIRPathHostServices());
         }
 
-        public StructureMapUtilitiesAnalyze(IWorkerContext worker, ITransformerServices services)
+        public StructureMapUtilitiesExecute(IWorkerContext worker, ITransformerServices services)
         {
             this.worker = worker;
             this.services = services;
@@ -198,14 +196,13 @@ namespace Hl7.Fhir.MappingLanguage
             fpe.setHostServices(new FFHIRPathHostServices());
         }
 
-        public StructureMapUtilitiesAnalyze(IWorkerContext worker)
+        public StructureMapUtilitiesExecute(IWorkerContext worker)
         {
             this.worker = worker;
             fpe = new FHIRPathEngine(worker);
             fpe.setHostServices(new FFHIRPathHostServices());
         }
 
-        #region << Render FML from StructureMap >>
         public static string render(StructureMap map)
         {
             StringBuilder b = new StringBuilder();
@@ -238,11 +235,7 @@ namespace Hl7.Fhir.MappingLanguage
         public interface IWorkerContext
         {
             T fetchResource<T>(string url) where T : Resource;
-            ValueSet.ExpansionComponent expandVS(ValueSet vs, bool v1, bool v2);
-            string getOverrideVersionNs();
-            ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value);
-            StructureDefinition fetchTypeDefinition(string code);
-            T fetchResourceWithException<T>(string uri) where T : Resource;
+            ValueSetExpansionOutcome expandVS(ValueSet vs, bool v1, bool v2);
         }
 
         private static void produceConceptMap(StringBuilder b, ConceptMap cm)
@@ -760,9 +753,7 @@ namespace Hl7.Fhir.MappingLanguage
             b.Append(" // ");
             b.Append(doco.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " "));
         }
-        #endregion
 
-        #region << Parse FML into StructureMap >>
         public StructureMap parse(string text, string srcName)
         {
             FHIRLexer lexer = new FHIRLexer(text, srcName);
@@ -1222,7 +1213,7 @@ namespace Hl7.Fhir.MappingLanguage
                 source.Context = "@search";
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                source.setUserData(MAP_SEARCH_EXPRESSION, node);
+                // source.setUserData(MAP_SEARCH_EXPRESSION, node);
                 source.Element = node.ToString();
                 lexer.token(")");
             }
@@ -1260,21 +1251,21 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                source.setUserData(MAP_WHERE_EXPRESSION, node);
+                // source.setUserData(MAP_WHERE_EXPRESSION, node);
                 source.Condition = node.ToString();
             }
             if (lexer.hasToken("check"))
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                source.setUserData(MAP_WHERE_CHECK, node);
+                // source.setUserData(MAP_WHERE_CHECK, node);
                 source.Check = node.ToString();
             }
             if (lexer.hasToken("log"))
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                source.setUserData(MAP_WHERE_CHECK, node);
+                // source.setUserData(MAP_WHERE_CHECK, node);
                 source.LogMessage = node.ToString();
             }
         }
@@ -1310,7 +1301,7 @@ namespace Hl7.Fhir.MappingLanguage
                 // inline fluentpath expression
                 target.Transform = StructureMap.StructureMapTransform.Evaluate;
                 ExpressionNode node = fpe.parse(lexer);
-                target.setUserData(MAP_EXPRESSION, node);
+                // target.setUserData(MAP_EXPRESSION, node);
                 target.addParameter().Value = new FhirString(node.ToString());
                 lexer.token(")");
             }
@@ -1323,7 +1314,7 @@ namespace Hl7.Fhir.MappingLanguage
                     parseParameter(target, lexer);
                     lexer.token(",");
                     ExpressionNode node = fpe.parse(lexer);
-                    target.setUserData(MAP_EXPRESSION, node);
+                    // target.setUserData(MAP_EXPRESSION, node);
                     target.addParameter().Value = new FhirString(node.ToString());
                 }
                 else
@@ -1404,7 +1395,27 @@ namespace Hl7.Fhir.MappingLanguage
 
             return new FhirString(lexer.processConstant(s));
         }
-        #endregion
+
+        public StructureDefinition getTargetType(StructureMap map)
+        {
+            bool found = false;
+            StructureDefinition res = null;
+            foreach (StructureMap.StructureComponent uses in map.Structure)
+            {
+                if (uses.Mode == StructureMap.StructureMapModelMode.Target)
+                {
+                    if (found)
+                        throw new FHIRException("Multiple targets found in map " + map.Url);
+                    found = true;
+                    res = worker.fetchResource<StructureDefinition>(uses.Url);
+                    if (res == null)
+                        throw new FHIRException("Unable to find " + uses.Url + " referenced from map " + map.Url);
+                }
+            }
+            if (res == null)
+                throw new FHIRException("No targets found in map " + map.Url);
+            return res;
+        }
 
         public enum VariableMode
         {
@@ -1541,6 +1552,748 @@ namespace Hl7.Fhir.MappingLanguage
          * @param result
          * @throws FHIRException
          */
+        protected void getChildrenByName(Base item, string name, List<Base> result)
+        {
+            foreach (Base v in item.listChildrenByName(name, true))
+                if (v != null)
+                    result.Add(v);
+        }
+
+
+        public void transform(Object appInfo, Base source, StructureMap map, Base target)
+        {
+            TransformContext context = new TransformContext(appInfo);
+            log("Start Transform " + map.Url);
+            StructureMap.GroupComponent g = map.Group.First();
+
+            Variables vars = new Variables();
+            vars.add(VariableMode.INPUT, getInputName(g, StructureMap.StructureMapInputMode.Source, "source"), source);
+            if (target != null)
+                vars.add(VariableMode.OUTPUT, getInputName(g, StructureMap.StructureMapInputMode.Target, "target"), target);
+
+            executeGroup("", context, map, vars, g, true);
+            // TODO: BRIAN what is this sort oder, the ordering of the elements in the property?
+            //if (target is Element)
+            //    ((Element)target).sort();
+        }
+
+        private string getInputName(StructureMap.GroupComponent g, StructureMap.StructureMapInputMode mode, string def)
+        {
+            string name = null;
+            foreach (var inp in g.Input)
+            {
+                if (inp.Mode == mode)
+                    if (name != null)
+                        throw new DefinitionException("This engine does not support multiple source inputs");
+                    else
+                        name = inp.Name;
+            }
+            return name == null ? def : name;
+        }
+
+        private void executeGroup(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, bool atRoot)
+        {
+            log(indent + "Group : " + group.Name + "; vars = " + vars.summary());
+            // todo: check inputs
+            if (!string.IsNullOrEmpty(group.Extends))
+            {
+                ResolvedGroup rg = resolveGroupReference(map, group, group.Extends);
+                executeGroup(indent + " ", context, rg.targetMap, vars, rg.target, false);
+            }
+
+            foreach (StructureMap.RuleComponent r in group.Rule)
+            {
+                executeRule(indent + "  ", context, map, vars, group, r, atRoot);
+            }
+        }
+
+        private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
+        {
+            log(indent + "rule : " + rule.Name + "; vars = " + vars.summary());
+            Variables srcVars = vars.copy();
+            if (rule.Source.Count() != 1)
+                throw new FHIRException("Rule \"" + rule.Name + "\": not handled yet");
+            List<Variables> source = processSource(rule.Name, context, srcVars, rule.Source.First(), map.Url, indent);
+            if (source != null)
+            {
+                foreach (Variables v in source)
+                {
+                    foreach (StructureMap.TargetComponent t in rule.Target)
+                    {
+                        processTarget(rule.Name, context, v, map, group, t, rule.Source.Count() == 1 ? rule.getSourceFirstRep().getVariable() : null, atRoot, vars);
+                    }
+                    if (rule.Rule != null)
+                    {
+                        foreach (StructureMap.RuleComponent childrule in rule.Rule)
+                        {
+                            executeRule(indent + "  ", context, map, v, group, childrule, false);
+                        }
+                    }
+                    else if (rule.Dependent != null)
+                    {
+                        foreach (var dependent in rule.Dependent)
+                        {
+                            executeDependency(indent + "  ", context, map, v, group, dependent);
+                        }
+                    }
+                    else if (rule.Source.Count() == 1 && rule.getSourceFirstRep().Variable != null && rule.Target.Count() == 1 && rule.getTargetFirstRep().hasVariable() && rule.getTargetFirstRep().Transform == StructureMapTransform.CREATE && !rule.getTargetFirstRep().hasParameter())
+                    {
+                        // simple inferred, map by type
+                        System.Diagnostics.Trace.WriteLine(v.summary());
+                        Base src = v.get(VariableMode.INPUT, rule.getSourceFirstRep().Variable);
+                        Base tgt = v.get(VariableMode.OUTPUT, rule.getTargetFirstRep().Variable);
+                        string srcType = src.TypeName;
+                        string tgtType = tgt.TypeName;
+                        ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
+                        Variables vdef = new Variables();
+                        vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
+                        vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
+                        executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
+                    }
+                }
+            }
+        }
+
+        private void executeDependency(string indent, TransformContext context, StructureMap map, Variables vin, StructureMap.GroupComponent group, StructureMap.DependentComponent dependent)
+        {
+            ResolvedGroup rg = resolveGroupReference(map, group, dependent.Name);
+
+            if (rg.target.Input.Count != dependent.Variable.Count())
+            {
+                throw new FHIRException($"Rule '{dependent.Name}' has {rg.target.Input.Count()} but the invocation has {dependent.Variable.Count()} variables");
+            }
+            Variables v = new Variables();
+            for (int i = 0; i < rg.target.Input.Count(); i++)
+            {
+                var input = rg.target.Input[i];
+                var rdp = dependent.VariableElement[i];
+                string varVal = rdp.Value;
+                VariableMode mode = input.Mode == StructureMap.StructureMapInputMode.Source ? VariableMode.INPUT : VariableMode.OUTPUT;
+                Base vv = vin.get(mode, varVal);
+                if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenient
+                    vv = vin.get(VariableMode.OUTPUT, varVal);
+                if (vv == null)
+                    throw new FHIRException("Rule '" + dependent.Name + "' " + mode.ToString() + " variable '" + input.Name + "' named as '" + var + "' has no value (vars = " + vin.summary() + ")");
+                v.add(mode, input.Name, vv);
+            }
+            executeGroup(indent + "  ", context, rg.targetMap, v, rg.target, false);
+        }
+
+        private string determineTypeFromSourceType(StructureMap map, StructureMap.GroupComponent source, Base baseV, string[] types)
+        {
+            string type = baseV.TypeName;
+            string kn = "type^" + type;
+            if (source.hasUserData(kn))
+                return source.getUserString(kn);
+
+            ResolvedGroup res = new ResolvedGroup();
+            res.targetMap = null;
+            res.target = null;
+            foreach (StructureMap.GroupComponent grp in map.getGroup())
+            {
+                if (matchesByType(map, grp, type))
+                {
+                    if (res.targetMap == null)
+                    {
+                        res.targetMap = map;
+                        res.target = grp;
+                    }
+                    else
+                        throw new FHIRException("Multiple possible matches looking for default rule for '" + type + "'");
+                }
+            }
+            if (res.targetMap != null)
+            {
+                string result = getActualType(res.targetMap, res.target.Input[1].Type);
+                source.setUserData(kn, result);
+                return result;
+            }
+
+            foreach (UriType imp in map.getImport())
+            {
+                List<StructureMap> impMapList = findMatchingMaps(imp.getValue());
+                if (impMapList.Count() == 0)
+                    throw new FHIRException("Unable to find map(s) for " + imp.getValue());
+                foreach (StructureMap impMap in impMapList)
+                {
+                    if (!impMap.Url.Equals(map.Url))
+                    {
+                        foreach (StructureMap.GroupComponent grp in impMap.getGroup())
+                        {
+                            if (matchesByType(impMap, grp, type))
+                            {
+                                if (res.targetMap == null)
+                                {
+                                    res.targetMap = impMap;
+                                    res.target = grp;
+                                }
+                                else
+                                    throw new FHIRException("Multiple possible matches for default rule for '" + type + "' in " + res.targetMap.Url + " (" + res.target.Name + ") and " + impMap.Url + " (" + grp.Name + ")");
+                            }
+                        }
+                    }
+                }
+            }
+            if (res.target == null)
+                throw new FHIRException("No matches found for default rule for '" + type + "' from " + map.Url);
+            string result = getActualType(res.targetMap, res.target.Input[1].Type); // should be .getType, but R2...
+            source.setUserData(kn, result);
+            return result;
+        }
+
+        private List<StructureMap> findMatchingMaps(string value)
+        {
+            List<StructureMap> res = new List<StructureMap>();
+            if (value.Contains("*"))
+            {
+                foreach (StructureMap sm in worker.listTransforms())
+                {
+                    if (urlMatches(value, sm.Url))
+                    {
+                        res.add(sm);
+                    }
+                }
+            }
+            else
+            {
+                StructureMap sm = worker.getTransform(value);
+                if (sm != null)
+                    res.add(sm);
+            }
+            Set<string> check = new HashSet<string>();
+            foreach (StructureMap sm in res)
+            {
+                if (check.contains(sm.Url))
+                    throw new Exception("duplicate");
+                else
+                    check.add(sm.Url);
+            }
+            return res;
+        }
+
+        private bool urlMatches(string mask, string url)
+        {
+            return url.Length > mask.Length && url.StartsWith(mask.Substring(0, mask.IndexOf("*"))) && url.EndsWith(mask.Substring(mask.IndexOf("*") + 1));
+        }
+
+        private ResolvedGroup resolveGroupByTypes(StructureMap map, string ruleid, StructureMap.GroupComponent source, string srcType, string tgtType)
+        {
+            string kn = "types^" + srcType + "in" + tgtType;
+            if (source.hasUserData(kn))
+                return (ResolvedGroup)source.getUserData(kn);
+
+            ResolvedGroup res = new ResolvedGroup();
+            res.targetMap = null;
+            res.target = null;
+            foreach (StructureMap.GroupComponent grp in map.getGroup())
+            {
+                if (matchesByType(map, grp, srcType, tgtType))
+                {
+                    if (res.targetMap == null)
+                    {
+                        res.targetMap = map;
+                        res.target = grp;
+                    }
+                    else
+                        throw new FHIRException("Multiple possible matches looking for rule for '" + srcType + "/" + tgtType + "', from rule '" + ruleid + "'");
+                }
+            }
+            if (res.targetMap != null)
+            {
+                source.setUserData(kn, res);
+                return res;
+            }
+
+            foreach (var imp in map.Import)
+            {
+                List<StructureMap> impMapList = findMatchingMaps(imp.getValue());
+                if (impMapList.Count == 0)
+                    throw new FHIRException("Unable to find map(s) for " + imp.getValue());
+                foreach (StructureMap impMap in impMapList)
+                {
+                    if (!impMap.Url.Equals(map.Url))
+                    {
+                        foreach (StructureMap.GroupComponent grp in impMap.getGroup())
+                        {
+                            if (matchesByType(impMap, grp, srcType, tgtType))
+                            {
+                                if (res.targetMap == null)
+                                {
+                                    res.targetMap = impMap;
+                                    res.target = grp;
+                                }
+                                else
+                                    throw new FHIRException("Multiple possible matches for rule for '" + srcType + "/" + tgtType + "' in " + res.targetMap.Url + " and " + impMap.Url + ", from rule '" + ruleid + "'");
+                            }
+                        }
+                    }
+                }
+            }
+            if (res.target == null)
+                throw new FHIRException("No matches found for rule for '" + srcType + " to " + tgtType + "' from " + map.Url + ", from rule '" + ruleid + "'");
+            source.setUserData(kn, res);
+            return res;
+        }
+
+
+        private bool matchesByType(StructureMap map, StructureMap.GroupComponent grp, string type)
+        {
+            if (grp.getTypeMode() != StructureMapGroupTypeMode.TYPEANDTYPES)
+                return false;
+            if (grp.Input.Count() != 2 || grp.Input.First().getMode() != StructureMapInputMode.SOURCE || grp.Input[1].getMode() != StructureMapInputMode.TARGET)
+                return false;
+            return matchesType(map, type, grp.Input.First().Type);
+        }
+
+        private bool matchesByType(StructureMap map, StructureMap.GroupComponent grp, string srcType, string tgtType)
+        {
+            if (grp.getTypeMode() == StructureMapGroupTypeMode.NONE)
+                return false;
+            if (grp.Input.Count() != 2 || grp.Input.First().getMode() != StructureMapInputMode.SOURCE || grp.Input[1].getMode() != StructureMapInputMode.TARGET)
+                return false;
+            if (!grp.Input.First().hasType() || !grp.Input[1].hasType())
+                return false;
+            return matchesType(map, srcType, grp.Input.First().Type) && matchesType(map, tgtType, grp.Input[1].Type);
+        }
+
+        private bool matchesType(StructureMap map, string actualType, string statedType)
+        {
+            // check the aliases
+            foreach (StructureMap.StructureComponent imp in map.Structure)
+            {
+                if (imp.hasAlias() && statedType.Equals(imp.Alias))
+                {
+                    StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
+                    if (sd != null)
+                        statedType = sd.Type;
+                    break;
+                }
+            }
+
+            if (Utilities.isAbsoluteUrl(actualType))
+            {
+                StructureDefinition sd = worker.fetchResource<StructureDefinition>(actualType);
+                if (sd != null)
+                    actualType = sd.Type;
+            }
+            if (Utilities.isAbsoluteUrl(statedType))
+            {
+                StructureDefinition sd = worker.fetchResource<StructureDefinition>(statedType);
+                if (sd != null)
+                    statedType = sd.Type;
+            }
+            return actualType.Equals(statedType);
+        }
+
+        private string getActualType(StructureMap map, string statedType)
+        {
+            // check the aliases
+            foreach (StructureMap.StructureComponent imp in map.Structure)
+            {
+                if (imp.Alias != null && statedType.Equals(imp.Alias))
+                {
+                    StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
+                    if (sd == null)
+                        throw new FHIRException("Unable to resolve structure " + imp.Url);
+                    return sd.Id; // should be sd.Type, but R2...
+                }
+            }
+            return statedType;
+        }
+
+
+        private ResolvedGroup resolveGroupReference(StructureMap map, StructureMap.GroupComponent source, string name)
+        {
+            string kn = "ref^" + name;
+            if (source.hasUserData(kn))
+                return (ResolvedGroup)source.getUserData(kn);
+
+            ResolvedGroup res = new ResolvedGroup();
+            res.targetMap = null;
+            res.target = null;
+            foreach (StructureMap.GroupComponent grp in map.getGroup())
+            {
+                if (grp.Name.Equals(name))
+                {
+                    if (res.targetMap == null)
+                    {
+                        res.targetMap = map;
+                        res.target = grp;
+                    }
+                    else
+                        throw new FHIRException("Multiple possible matches for rule '" + name + "'");
+                }
+            }
+            if (res.targetMap != null)
+            {
+                source.setUserData(kn, res);
+                return res;
+            }
+
+            foreach (UriType imp in map.getImport())
+            {
+                List<StructureMap> impMapList = findMatchingMaps(imp.getValue());
+                if (impMapList.Count() == 0)
+                    throw new FHIRException("Unable to find map(s) for " + imp.getValue());
+                foreach (StructureMap impMap in impMapList)
+                {
+                    if (!impMap.Url.Equals(map.Url))
+                    {
+                        foreach (StructureMap.GroupComponent grp in impMap.getGroup())
+                        {
+                            if (grp.Name.Equals(name))
+                            {
+                                if (res.targetMap == null)
+                                {
+                                    res.targetMap = impMap;
+                                    res.target = grp;
+                                }
+                                else
+                                    throw new FHIRException("Multiple possible matches for rule group '" + name + "' in " +
+                                     res.targetMap.Url + "#" + res.target.Name + " and " +
+                                     impMap.Url + "#" + grp.Name);
+                            }
+                        }
+                    }
+                }
+            }
+            if (res.target == null)
+                throw new FHIRException("No matches found for rule '" + name + "'. Reference found in " + map.Url);
+            source.setUserData(kn, res);
+            return res;
+        }
+
+        private List<Variables> processSource(string ruleId, TransformContext context, Variables vars, StructureMap.SourceComponent src, string pathForErrors, string indent)
+        {
+            List<Base> items;
+            if (src.getContext().Equals("@search"))
+            {
+                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_SEARCH_EXPRESSION);
+                if (expr == null)
+                {
+                    expr = fpe.parse(src.getElement());
+                    src.setUserData(MAP_SEARCH_EXPRESSION, expr);
+                }
+                string search = fpe.evaluateToString(vars, null, null, new FhirString(), expr); // string is a holder of nothing to ensure that variables are processed correctly
+                items = services.performSearch(context.appInfo, search);
+            }
+            else
+            {
+                items = new List<Base>();
+                Base b = vars.get(VariableMode.INPUT, src.getContext());
+                if (b == null)
+                    throw new FHIRException("Unknown input variable " + src.getContext() + " in " + pathForErrors + " rule " + ruleId + " (vars = " + vars.summary() + ")");
+
+                if (!src.hasElement())
+                    items.add(b);
+                else
+                {
+                    getChildrenByName(b, src.getElement(), items);
+                    if (items.Count() == 0 && src.hasDefaultValue())
+                        items.add(src.getDefaultValue());
+                }
+            }
+
+            if (src.hasType())
+            {
+                List<Base> remove = new List<Base>();
+                foreach (Base item in items)
+                {
+                    if (item != null && !isType(item, src.Type))
+                    {
+                        remove.add(item);
+                    }
+                }
+                items.removeAll(remove);
+            }
+
+            if (src.hasCondition())
+            {
+                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_EXPRESSION);
+                if (expr == null)
+                {
+                    expr = fpe.parse(src.getCondition());
+                    //        fpe.check(context.appInfo, ??, ??, expr)
+                    src.setUserData(MAP_WHERE_EXPRESSION, expr);
+                }
+                List<Base> remove = new List<Base>();
+                foreach (Base item in items)
+                {
+                    if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
+                    {
+                        log(indent + "  condition [" + src.getCondition() + "] for " + item.ToString() + " : false");
+                        remove.add(item);
+                    }
+                    else
+                        log(indent + "  condition [" + src.getCondition() + "] for " + item.ToString() + " : true");
+                }
+                items.removeAll(remove);
+            }
+
+            if (src.hasCheck())
+            {
+                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_CHECK);
+                if (expr == null)
+                {
+                    expr = fpe.parse(src.getCheck());
+                    //        fpe.check(context.appInfo, ??, ??, expr)
+                    src.setUserData(MAP_WHERE_CHECK, expr);
+                }
+                List<Base> remove = new List<Base>();
+                foreach (Base item in items)
+                {
+                    if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
+                        throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed");
+                }
+            }
+
+            if (src.hasLogMessage())
+            {
+                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_LOG);
+                if (expr == null)
+                {
+                    expr = fpe.parse(src.getLogMessage());
+                    //        fpe.check(context.appInfo, ??, ??, expr)
+                    src.setUserData(MAP_WHERE_LOG, expr);
+                }
+                CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+                foreach (Base item in items)
+                    b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
+                if (b.length() > 0)
+                    services.log(b.ToString());
+            }
+
+
+            if (src.hasListMode() && !items.isEmpty())
+            {
+                switch (src.getListMode())
+                {
+                    case FIRST:
+                        Base bt = items.First();
+                        items.clear();
+                        items.add(bt);
+                        break;
+                    case NOTFIRST:
+                        if (items.Count() > 0)
+                            items.remove(0);
+                        break;
+                    case LAST:
+                        bt = items.get(items.Count() - 1);
+                        items.clear();
+                        items.add(bt);
+                        break;
+                    case NOTLAST:
+                        if (items.Count() > 0)
+                            items.remove(items.Count() - 1);
+                        break;
+                    case ONLYONE:
+                        if (items.Count() > 1)
+                            throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed: the collection has more than one item");
+                        break;
+                    case NULL:
+                }
+            }
+            List<Variables> result = new List<Variables>();
+            foreach (Base r in items)
+            {
+                Variables v = vars.copy();
+                if (src.hasVariable())
+                    v.add(VariableMode.INPUT, src.getVariable(), r);
+                result.Add(v);
+            }
+            return result;
+        }
+
+
+        private bool isType(Base item, string type)
+        {
+            if (type.Equals(item.TypeName))
+                return true;
+            return false;
+        }
+
+        private void processTarget(string ruleId, TransformContext context, Variables vars, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, string srcVar, bool atRoot, Variables sharedVars)
+        {
+            Base dest = null;
+            if (tgt.hasContext())
+            {
+                dest = vars.get(VariableMode.OUTPUT, tgt.getContext());
+                if (dest == null)
+                    throw new FHIRException("Rule \"" + ruleId + "\": target context not known: " + tgt.getContext());
+                if (!tgt.hasElement())
+                    throw new FHIRException("Rule \"" + ruleId + "\": Not supported yet");
+            }
+            Base v = null;
+            if (tgt.hasTransform())
+            {
+                v = runTransform(ruleId, context, map, group, tgt, vars, dest, tgt.getElement(), srcVar, atRoot);
+                if (v != null && dest != null)
+                    v = dest.setProperty(tgt.getElement().hashCode(), tgt.getElement(), v); // reset v because some implementations may have to rewrite v when setting the value
+            }
+            else if (dest != null)
+            {
+                if (tgt.hasListMode(StructureMapTargetListMode.SHARE))
+                {
+                    v = sharedVars.get(VariableMode.SHARED, tgt.getListRuleId());
+                    if (v == null)
+                    {
+                        v = dest.makeProperty(tgt.getElement().hashCode(), tgt.getElement());
+                        sharedVars.add(VariableMode.SHARED, tgt.getListRuleId(), v);
+                    }
+                }
+                else
+                {
+                    v = dest.makeProperty(tgt.getElement().hashCode(), tgt.getElement());
+                }
+            }
+            if (!string.IsNullOrEmpty(tgt.Variable) && v != null)
+                vars.add(VariableMode.OUTPUT, tgt.Variable, v);
+        }
+
+
+        private Base runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, Base dest, string element, string srcVar, bool root)
+        {
+            try
+            {
+                switch (tgt.Transform)
+                {
+                    case StructureMap.StructureMapTransform.Create:
+                        string tn;
+                        if (!tgt.Parameter.Any())
+                        {
+                            // we have to work out the type. First, we see if there is a single type for the target. If there is, we use that
+                            string[] types = dest.getTypesForProperty(element.hashCode(), element);
+                            if (types.Count() == 1 && !"*".Equals(types[0]) && !types[0].Equals("Resource"))
+                                tn = types[0];
+                            else if (srcVar != null)
+                            {
+                                tn = determineTypeFromSourceType(map, group, vars.get(VariableMode.INPUT, srcVar), types);
+                            }
+                            else
+                                throw new Exception("Cannot determine type implicitly because there is no single input variable");
+                        }
+                        else
+                        {
+                            tn = getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString());
+                            // ok, now we resolve the type name against the import statements
+                            foreach (StructureMap.StructureComponent uses in map.Structure)
+                            {
+                                if (uses.Mode == StructureMap.StructureMapModelMode.Target && uses.hasAlias() && tn.Equals(uses.Alias))
+                                {
+                                    tn = uses.Url;
+                                    break;
+                                }
+                            }
+                        }
+                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : ResourceFactory.createResourceOrType(tn);
+                        if Parser && !res.TypeName.Equals("Parameters"))
+                        {
+                            //	        res.setIdBase(tgt.Parameter.Count() > 1 ? getParamString(vars, tgt.Parameter.First()) : UUID.randomUUID().ToString().toLowerCase());
+                            if (services != null)
+                                res = services.createResource(context.getAppInfo(), res, root);
+                        }
+                        if (tgt.hasUserData("profile"))
+                            res.setUserData("profile", tgt.getUserData("profile"));
+                        return res;
+
+                    case StructureMap.StructureMapTransform.Copy:
+                        return getParam(vars, tgt.Parameter.First());
+
+                    case StructureMap.StructureMapTransform.Evaluate:
+                        ExpressionNode expr = (ExpressionNode)tgt.getUserData(MAP_EXPRESSION);
+                        if (expr == null)
+                        {
+                            expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
+                            tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
+                        }
+                        List<Base> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : new BooleanType(false), expr);
+                        if (v.Count() == 0)
+                            return null;
+                        else if (v.Count() != 1)
+                            throw new FHIRException("Rule \"" + ruleId + "\": Evaluation of " + expr.ToString() + " returned " + Integer.toString(v.Count()) + " objects");
+                        else
+                            return v.First();
+
+                    case StructureMap.StructureMapTransform.Truncate:
+                        string src = getParamString(vars, tgt.Parameter.First());
+                        string len = getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString());
+                        if (Utilities.isInteger(len))
+                        {
+                            int l = Integer.parseInt(len);
+                            if (src.Length > l)
+                                src = src.Substring(0, l);
+                        }
+                        return new FhirString(src);
+
+                    case StructureMap.StructureMapTransform.Escape:
+                        throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
+
+                    case StructureMap.StructureMapTransform.Cast:
+                        src = getParamString(vars, tgt.Parameter.First());
+                        if (tgt.Parameter.Count() == 1)
+                            throw new FHIRException("Implicit type parameters on cast not yet supported");
+                        string t = getParamString(vars, tgt.Parameter[1]);
+                        if (t.Equals("string"))
+                            return new FhirString(src);
+                        else
+                            throw new FHIRException("cast to " + t + " not yet supported");
+
+                    case StructureMap.StructureMapTransform.Append:
+                        StringBuilder sb = new StringBuilder(getParamString(vars, tgt.Parameter.First()));
+                        for (int i = 1; i < tgt.Parameter.Count(); i++)
+                            sb.Append(getParamString(vars, tgt.Parameter[i]));
+                        return new FhirString(sb.ToString());
+
+                    case StructureMap.StructureMapTransform.Translate:
+                        return translate(context, map, vars, tgt.Parameter);
+
+                    case StructureMap.StructureMapTransform.Reference:
+                        Base b = getParam(vars, tgt.Parameter.First());
+                        if (b == null)
+                            throw new FHIRException("Rule \"" + ruleId + "\": Unable to find parameter " + ((IdType)tgt.Parameter.First().getValue()).asStringValue());
+                        if (!b.isResource())
+                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.TypeName);
+                        else
+                        {
+                            string id = b.getIdBase();
+                            if (id == null)
+                            {
+                                id = UUID.randomUUID().ToString().toLowerCase();
+                                b.setIdBase(id);
+                            }
+                            return new Reference().setReference(b.TypeName + "/" + id);
+                        }
+                    case StructureMap.StructureMapTransform.DateOp:
+                        throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
+
+                    case StructureMap.StructureMapTransform.Uuid:
+                        return new Id(UUID.randomUUID().ToString());
+
+                    case StructureMap.StructureMapTransform.Pointer:
+                        b = getParam(vars, tgt.Parameter.First());
+                        if (b is Resource)
+                            return new FhirUri("urn:uuid:" + ((Resource)b).Id);
+
+                        else
+                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.TypeName);
+                    case StructureMap.StructureMapTransform.Cc:
+                        CodeableConcept cc = new CodeableConcept();
+                        cc.Coding.Add(buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString())));
+                        return cc;
+
+                    case StructureMap.StructureMapTransform.C:
+                        Coding c = buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
+                        return c;
+
+                    default:
+                        throw new Exception("Rule \"" + ruleId + "\": Transform Unknown: " + tgt.Transform.GetLiteral());
+                }
+            }
+            catch (Exception e)
+            {
+                throw new FHIRException("Exception executing transform " + tgt.ToString() + " on Rule \"" + ruleId + "\": " + e.getMessage(), e);
+            }
+        }
 
 
         private Coding buildCoding(string uri, string code)
@@ -1548,27 +2301,27 @@ namespace Hl7.Fhir.MappingLanguage
             // if we can get this as a valueSet, we will
             string system = null;
             string display = null;
-            ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException<ValueSet>(uri);
+            ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException("ValueSet", uri);
             if (vs != null)
             {
-                var vse = worker.expandVS(vs, true, false);
-                //if (vse.getError() != null)
-                //    throw new FHIRException(vse.getError());
+                ValueSetExpansionOutcome vse = worker.expandVS(vs, true, false);
+                if (vse.getError() != null)
+                    throw new FHIRException(vse.getError());
                 CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-                foreach (var t in vse.Contains)
+                foreach (ValueSetExpansionContainsComponent t in vse.getValueset().getExpansion().getContains())
                 {
-                    if (!string.IsNullOrEmpty(t.Code))
-                        b.append(t.Code);
-                    if (code.Equals(t.Code) && !string.IsNullOrEmpty(t.System))
+                    if (t.hasCode())
+                        b.Append(t.Code);
+                    if (code.Equals(t.Code) && t.hasSystem())
                     {
-                        system = t.System;
-                        display = t.Display;
+                        system = t.getSystem();
+                        display = t.getDisplay();
                         break;
                     }
-                    if (code.Equals(t.Display, StringComparison.InvariantCultureIgnoreCase) && !string.IsNullOrEmpty(t.System))
+                    if (code.equalsIgnoreCase(t.getDisplay()) && t.hasSystem())
                     {
-                        system = t.System;
-                        display = t.Display;
+                        system = t.getSystem();
+                        display = t.getDisplay();
                         break;
                     }
                 }
@@ -1584,12 +2337,22 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
+        private string getParamStringNoNull(Variables vars, StructureMap.ParameterComponent parameter, string message)
+        {
+            Base b = getParam(vars, parameter);
+            if (b == null)
+                throw new FHIRException("Unable to find a value for " + parameter.ToString() + ". Context: " + message);
+            if (!b.hasPrimitiveValue())
+                throw new FHIRException("Found a value for " + parameter.ToString() + ", but it has a type of " + b.TypeName + " and cannot be treated as a string. Context: " + message);
+            return b.primitiveValue();
+        }
+
         private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
         {
             Base b = getParam(vars, parameter);
-            if (b is PrimitiveType pt)
-                return pt.ToString();
-            return null;
+            if (b == null || !b.hasPrimitiveValue())
+                return null;
+            return b.primitiveValue();
         }
 
         private Base getParam(Variables vars, StructureMap.ParameterComponent parameter)
@@ -1607,6 +2370,16 @@ namespace Hl7.Fhir.MappingLanguage
             return b;
         }
 
+
+        private Base translate(TransformContext context, StructureMap map, Variables vars, List<StructureMap.ParameterComponent> parameter)
+        {
+            Base src = getParam(vars, parameter.First());
+            string id = getParamString(vars, parameter[1]);
+            string fld = parameter.Count() > 2 ? getParamString(vars, parameter[2]) : null;
+            return translate(context, map, src, id, fld);
+        }
+
+
         private class SourceElementComponentWrapper
         {
             internal ConceptMap.GroupComponent group;
@@ -1619,13 +2392,153 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
+        public Base translate(TransformContext context, StructureMap map, Base source, string conceptMapUrl, string fieldToReturn)
+        {
+            Coding src = new Coding();
+            if (source.isPrimitive())
+            {
+                src.setCode(source.primitiveValue());
+            }
+            else if ("Coding".Equals(source.TypeName))
+            {
+                Base[] b = source.getProperty("system".hashCode(), "system", true);
+                if (b.length == 1)
+                    src.setSystem(b[0].primitiveValue());
+                b = source.getProperty("code".hashCode(), "code", true);
+                if (b.length == 1)
+                    src.setCode(b[0].primitiveValue());
+            }
+            else if ("CE".Equals(source.TypeName))
+            {
+                Base[] b = source.getProperty("codeSystem".hashCode(), "codeSystem", true);
+                if (b.length == 1)
+                    src.setSystem(b[0].primitiveValue());
+                b = source.getProperty("code".hashCode(), "code", true);
+                if (b.length == 1)
+                    src.setCode(b[0].primitiveValue());
+            }
+            else
+                throw new FHIRException("Unable to translate source " + source.TypeName);
+
+            string su = conceptMapUrl;
+            if (conceptMapUrl.Equals("http://hl7.org/fhir/ConceptMap/special-oid2uri"))
+            {
+                string uri = worker.oid2Uri(src.Code);
+                if (uri == null)
+                    uri = "urn:oid:" + src.Code;
+                if ("uri".Equals(fieldToReturn))
+                    return new FhirUri(uri);
+                else
+                    throw new FHIRException("Error in return code");
+            }
+            else
+            {
+                ConceptMap cmap = null;
+                if (conceptMapUrl.StartsWith("#"))
+                {
+                    foreach (Resource r in map.Contained)
+                    {
+                        if (r is ConceptMap && ((ConceptMap)r).Id.Equals(conceptMapUrl.Substring(1)))
+                        {
+                            cmap = (ConceptMap)r;
+                            su = map.Url + "#" + conceptMapUrl;
+                        }
+                    }
+                    if (cmap == null)
+                        throw new FHIRException("Unable to translate - cannot find map " + conceptMapUrl);
+                }
+                else
+                {
+                    if (conceptMapUrl.Contains("#"))
+                    {
+                        string[] p = conceptMapUrl.Split("\\#");
+                        StructureMap mapU = worker.fetchResource<StructureMap>(p[0]);
+                        foreach (Resource r in mapU.Contained)
+                        {
+                            if (r is ConceptMap && ((ConceptMap)r).Id.Equals(p[1]))
+                            {
+                                cmap = (ConceptMap)r;
+                                su = conceptMapUrl;
+                            }
+                        }
+                    }
+                    if (cmap == null)
+                        cmap = worker.fetchResource<ConceptMap>(conceptMapUrl);
+                }
+                Coding outcome = null;
+                bool done = false;
+                string message = null;
+                if (cmap == null)
+                {
+                    if (services == null)
+                        message = "No map found for " + conceptMapUrl;
+                    else
+                    {
+                        outcome = services.translate(context.appInfo, src, conceptMapUrl);
+                        done = true;
+                    }
+                }
+                else
+                {
+                    List<SourceElementComponentWrapper> list = new List<SourceElementComponentWrapper>();
+                    foreach (ConceptMap.GroupComponent g in cmap.Group)
+                    {
+                        foreach (ConceptMap.SourceElementComponent e in g.Element)
+                        {
+                            if (!src.hasSystem() && src.Code.Equals(e.Code))
+                                list.Add(new SourceElementComponentWrapper(g, e));
+                            else if (src.hasSystem() && src.System.Equals(g.Source) && src.Code.Equals(e.Code))
+                                list.Add(new SourceElementComponentWrapper(g, e));
+                        }
+                    }
+                    if (list.Count() == 0)
+                        done = true;
+                    else if (list.First().comp.Target.Count() == 0)
+                        message = "Concept map " + su + " found no translation for " + src.Code;
+                    else
+                    {
+                        foreach (TargetElementComponent tgt in list.First().comp.Target)
+                        {
+                            if (tgt.getEquivalence() == null || EnumSet.of(ConceptMapEquivalence.EQUAL, ConceptMapEquivalence.RELATEDTO, ConceptMapEquivalence.EQUIVALENT, ConceptMapEquivalence.WIDER).contains(tgt.getEquivalence()))
+                            {
+                                if (done)
+                                {
+                                    message = "Concept map " + su + " found multiple matches for " + src.Code;
+                                    done = false;
+                                }
+                                else
+                                {
+                                    done = true;
+                                    outcome = new Coding(list.First().group.Target, tgt.Code);
+                                }
+                            }
+                            else if (tgt.Equivalence == ConceptMapEquivalence.Unmatched)
+                            {
+                                done = true;
+                            }
+                        }
+                        if (!done)
+                            message = "Concept map " + su + " found no usable translation for " + src.Code;
+                    }
+                }
+                if (!done)
+                    throw new FHIRException(message);
+                if (outcome == null)
+                    return null;
+                if ("code".Equals(fieldToReturn))
+                    return new Code(outcome.Code);
+                else
+                    return outcome;
+            }
+        }
+
 
         public class PropertyWithType
         {
-            internal string path;
-            internal Property baseProperty;
-            internal Property profileProperty;
-            internal TypeDetails types;
+            private string path;
+            private Property baseProperty;
+            private Property profileProperty;
+            private TypeDetails types;
             public PropertyWithType(string path, Property baseProperty, Property profileProperty, TypeDetails types)
             {
 
@@ -1673,7 +2586,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         public class VariableForProfiling
         {
-            internal VariableMode mode;
+            private VariableMode mode;
             private string name;
             internal PropertyWithType property;
 
@@ -1728,7 +2641,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 VariableForProfiling vv = null;
                 foreach (VariableForProfiling v in list)
-                    if ((v.mode == mode) && v.getName().Equals(name))
+                    if ((v.mode == mode) && v.Name.Equals(name))
                         vv = v;
                 if (vv != null)
                     list.Remove(vv);
@@ -1754,14 +2667,14 @@ namespace Hl7.Fhir.MappingLanguage
                 if (mode == null)
                 {
                     foreach (VariableForProfiling v in list)
-                        if ((v.mode == VariableMode.OUTPUT) && v.getName().Equals(name))
+                        if ((v.mode == VariableMode.OUTPUT) && v.Name.Equals(name))
                             return v;
                     foreach (VariableForProfiling v in list)
-                        if ((v.mode == VariableMode.INPUT) && v.getName().Equals(name))
+                        if ((v.mode == VariableMode.INPUT) && v.Name.Equals(name))
                             return v;
                 }
                 foreach (VariableForProfiling v in list)
-                    if ((v.mode == mode) && v.getName().Equals(name))
+                    if ((v.mode == mode) && v.Name.Equals(name))
                         return v;
                 return null;
             }
@@ -1771,611 +2684,11 @@ namespace Hl7.Fhir.MappingLanguage
                 CommaSeparatedStringBuilder s = new CommaSeparatedStringBuilder();
                 CommaSeparatedStringBuilder t = new CommaSeparatedStringBuilder();
                 foreach (VariableForProfiling v in list)
-                    if (v.mode == VariableMode.INPUT)
+                    if (v.getMode() == VariableMode.INPUT)
                         s.append(v.summary());
                     else
                         t.append(v.summary());
                 return "source variables [" + s.ToString() + "], target variables [" + t.ToString() + "]";
-            }
-        }
-
-        public class StructureMapAnalysis
-        {
-            internal List<StructureDefinition> profiles = new List<StructureDefinition>();
-            internal XhtmlNode summary;
-            public List<StructureDefinition> getProfiles()
-            {
-                return profiles;
-            }
-            public XhtmlNode getSummary()
-            {
-                return summary;
-            }
-
-        }
-
-        /**
-         * Given a structure map, return a set of analyses on it.
-         *
-         * Returned:
-         *   - a list or profiles for what it will create. First profile is the target
-         *   - a table with a summary (in xhtml) for easy human undertanding of the mapping
-         *
-         *
-         * @param appInfo
-         * @param map
-         * @return
-         * @throws Exception
-         */
-        public StructureMapAnalysis analyse(Object appInfo, StructureMap map)
-        {
-            ids.Clear();
-            StructureMapAnalysis result = new StructureMapAnalysis();
-            TransformContext context = new TransformContext(appInfo);
-            VariablesForProfiling vars = new VariablesForProfiling(false, false);
-            StructureMap.GroupComponent start = map.Group.First();
-            foreach (var t in start.Input)
-            {
-                PropertyWithType ti = resolveType(map, t.Type, t.Mode);
-                if (t.Mode == StructureMap.StructureMapInputMode.Source)
-                    vars.add(VariableMode.INPUT, t.Name, ti);
-                else
-                    vars.add(VariableMode.OUTPUT, t.Name, createProfile(map, result.profiles, ti, start.Name, start));
-            }
-
-            result.summary = new XhtmlNode(NodeType.Element, "table").setAttribute("class", "grid");
-            XhtmlNode tr = result.summary.addTag("tr");
-            tr.addTag("td").addTag("b").addText("Source");
-            tr.addTag("td").addTag("b").addText("Target");
-
-            log("Start Profiling Transform " + map.Url);
-            analyseGroup("", context, map, vars, start, result);
-            ProfileUtilities pu = new ProfileUtilities(worker, null, pkp);
-            foreach (StructureDefinition sd in result.getProfiles())
-                pu.cleanUpDifferential(sd);
-            return result;
-        }
-
-
-        private void analyseGroup(string indent, TransformContext context, StructureMap map, VariablesForProfiling vars, StructureMap.GroupComponent group, StructureMapAnalysis result)
-        {
-            log(indent + "Analyse Group : " + group.Name);
-            // todo: extends
-            // todo: check inputs
-            XhtmlNode tr = result.summary.addTag("tr").setAttribute("class", "diff-title");
-            XhtmlNode xs = tr.addTag("td");
-            XhtmlNode xt = tr.addTag("td");
-            foreach (var inp in group.Input)
-            {
-                if (inp.Mode == StructureMap.StructureMapInputMode.Source)
-                    noteInput(vars, inp, VariableMode.INPUT, xs);
-                if (inp.Mode == StructureMap.StructureMapInputMode.Target)
-                    noteInput(vars, inp, VariableMode.OUTPUT, xt);
-            }
-            foreach (StructureMap.RuleComponent r in group.Rule)
-            {
-                analyseRule(indent + "  ", context, map, vars, group, r, result);
-            }
-        }
-
-
-        private void noteInput(VariablesForProfiling vars, StructureMap.InputComponent inp, VariableMode mode, XhtmlNode xs)
-        {
-            VariableForProfiling v = vars.get(mode, inp.Name);
-            if (v != null)
-                xs.addText("Input: " + v.property.getPath());
-        }
-
-        private void analyseRule(string indent, TransformContext context, StructureMap map, VariablesForProfiling vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, StructureMapAnalysis result)
-        {
-            log(indent + "Analyse rule : " + rule.Name);
-            XhtmlNode tr = result.getSummary().addTag("tr");
-            XhtmlNode xs = tr.addTag("td");
-            XhtmlNode xt = tr.addTag("td");
-
-            VariablesForProfiling srcVars = vars.copy();
-            if (rule.Source.Count() != 1)
-                throw new FHIRException("Rule \"" + rule.Name + "\": not handled yet");
-            VariablesForProfiling source = analyseSource(rule.Name, context, srcVars, rule.getSourceFirstRep(), xs);
-
-            TargetWriter tw = new TargetWriter();
-            foreach (StructureMap.TargetComponent t in rule.Target)
-            {
-                analyseTarget(rule.Name, context, source, map, t, rule.getSourceFirstRep().Variable, tw, result.getProfiles(), rule.Name);
-            }
-            tw.commit(xt);
-
-            foreach (StructureMap.RuleComponent childrule in rule.Rule)
-            {
-                analyseRule(indent + "  ", context, map, source, group, childrule, result);
-            }
-            //    foreach (StructureMapGroupRuleDependentComponent dependent in rule.Dependent) {
-            //      executeDependency(indent+"  ", context, map, v, group, dependent); // do we need group here?
-            //    }
-        }
-
-        public class StringPair
-        {
-            private string var;
-            private string desc;
-            public StringPair(string var, string desc)
-            {
-
-                this.var = var;
-                this.desc = desc;
-            }
-            public string getVar()
-            {
-                return var;
-            }
-            public string getDesc()
-            {
-                return desc;
-            }
-        }
-
-        public class TargetWriter
-        {
-            private Dictionary<string, string> newResources = new Dictionary<string, string>();
-            private List<StringPair> assignments = new List<StringPair>();
-            private List<StringPair> keyProps = new List<StringPair>();
-            private CommaSeparatedStringBuilder txt = new CommaSeparatedStringBuilder();
-
-            public void newResource(string var, string name)
-            {
-                newResources.Add(var, name);
-                txt.append("new " + name);
-            }
-
-            public void valueAssignment(string context, string desc)
-            {
-                assignments.Add(new StringPair(context, desc));
-                txt.append(desc);
-            }
-
-            public void keyAssignment(string context, string desc)
-            {
-                keyProps.Add(new StringPair(context, desc));
-                txt.append(desc);
-            }
-
-            public void commit(XhtmlNode xt)
-            {
-                if (newResources.Count() == 1 && assignments.Count() == 1 && newResources.ContainsKey(assignments.First().getVar()) && keyProps.Count() == 1 && newResources.ContainsKey(keyProps.First().getVar()))
-                {
-                    xt.addText("new " + assignments.First().getDesc() + " (" + keyProps.First().getDesc().Substring(keyProps.First().getDesc().IndexOf(".") + 1) + ")");
-                }
-                else if (newResources.Count() == 1 && assignments.Count() == 1 && newResources.ContainsKey(assignments.First().getVar()) && keyProps.Count() == 0)
-                {
-                    xt.addText("new " + assignments.First().getDesc());
-                }
-                else
-                {
-                    xt.addText(txt.ToString());
-                }
-            }
-        }
-
-        private VariablesForProfiling analyseSource(string ruleId, TransformContext context, VariablesForProfiling vars, StructureMap.SourceComponent src, XhtmlNode td)
-        {
-            VariableForProfiling var = vars.get(VariableMode.INPUT, src.Context);
-            if (var == null)
-                throw new FHIRException("Rule \"" + ruleId + "\": Unknown input variable " + src.Context);
-            PropertyWithType prop = var.getProperty();
-
-            bool optional = false;
-            bool repeating = false;
-
-            if (src.Condition != null)
-            {
-                optional = true;
-            }
-
-            if (src.Element != null)
-            {
-                Property element = prop.getBaseProperty().getChild(prop.types.getType(), src.Element);
-                if (element == null)
-                    throw new FHIRException("Rule \"" + ruleId + "\": Unknown element name " + src.Element);
-                if (element.getDefinition().Min == 0)
-                    optional = true;
-                if (element.getDefinition().Max.Equals("*"))
-                    repeating = true;
-                VariablesForProfiling result = vars.copy(optional, repeating);
-                TypeDetails type = new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON);
-                foreach (var tr in element.getDefinition().Type)
-                {
-                    if (string.IsNullOrEmpty(tr.Code))
-                        throw new Exception("Rule \"" + ruleId + "\": Element has no type");
-                    ProfiledType pt = new ProfiledType(tr.getWorkingCode());
-                    if (tr.ProfileElement.Any())
-                        pt.addProfiles(tr.ProfileElement);
-                    if (element.getDefinition().Binding != null)
-                        pt.addBinding(element.getDefinition().Binding);
-                    type.addType(pt);
-                }
-                td.addText(prop.getPath() + "." + src.Element);
-                if (src.Variable != null)
-                    result.add(VariableMode.INPUT, src.Variable, new PropertyWithType(prop.getPath() + "." + src.Element, element, null, type));
-                return result;
-            }
-            else
-            {
-                td.addText(prop.getPath()); // ditto!
-                return vars.copy(optional, repeating);
-            }
-        }
-
-
-        private void analyseTarget(string ruleId, TransformContext context, VariablesForProfiling vars, StructureMap map, StructureMap.TargetComponent tgt, string tv, TargetWriter tw, List<StructureDefinition> profiles, string sliceName)
-        {
-            VariableForProfiling var = null;
-            if (tgt.Context != null)
-            {
-                var = vars.get(VariableMode.OUTPUT, tgt.Context);
-                if (var == null)
-                    throw new FHIRException("Rule \"" + ruleId + "\": target context not known: " + tgt.Context);
-                if (tgt.Element == null)
-                    throw new FHIRException("Rule \"" + ruleId + "\": Not supported yet");
-            }
-
-
-            TypeDetails type = null;
-            if (tgt.Transform != null)
-            {
-                type = analyseTransform(context, map, tgt, var, vars);
-                // profiling: dest.setProperty(tgt.Element.hashCode(), tgt.Element, v);
-            }
-            else
-            {
-                Property vp = var.property.baseProperty.getChild(tgt.Element, tgt.Element);
-                if (vp == null)
-                    throw new FHIRException("Unknown Property " + tgt.Element + " on " + var.property.path);
-
-                type = new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, vp.getType(tgt.Element));
-            }
-
-            if (tgt.Transform == StructureMap.StructureMapTransform.Create)
-            {
-                string s = getParamString(vars, tgt.Parameter.First());
-                if (ModelInfo.SupportedResources.Contains(s))
-                    tw.newResource(tgt.Variable, s);
-            }
-            else
-            {
-                bool mapsSrc = false;
-                foreach (var p in tgt.Parameter)
-                {
-                    DataType pr = p.Value;
-                    if (pr is Id && ((Id)pr).ToString().Equals(tv))
-                        mapsSrc = true;
-                }
-                if (mapsSrc)
-                {
-                    if (var == null)
-                        throw new Exception("Rule \"" + ruleId + "\": Attempt to assign with no context");
-                    tw.valueAssignment(tgt.Context, var.property.getPath() + "." + tgt.Element + getTransformSuffix(tgt.Transform));
-                }
-                else if (tgt.Context != null)
-                {
-                    if (isSignificantElement(var.property, tgt.Element))
-                    {
-                        string td = describeTransform(tgt);
-                        if (td != null)
-                            tw.keyAssignment(tgt.Context, var.property.getPath() + "." + tgt.Element + " = " + td);
-                    }
-                }
-            }
-            DataType fixedV = generateFixedValue(tgt);
-
-            PropertyWithType prop = updateProfile(var, tgt.Element, type, map, profiles, sliceName, fixedV, tgt);
-            if (tgt.Variable != null)
-                if (tgt.Element != null)
-                    vars.add(VariableMode.OUTPUT, tgt.Variable, prop);
-                else
-                    vars.add(VariableMode.OUTPUT, tgt.Variable, prop);
-        }
-
-        private DataType generateFixedValue(StructureMap.TargetComponent tgt)
-        {
-            if (!allParametersFixed(tgt))
-                return null;
-            if (!tgt.Transform.HasValue)
-                return null;
-            switch (tgt.Transform)
-            {
-                case StructureMap.StructureMapTransform.Copy: return tgt.Parameter.First().Value;
-                case StructureMap.StructureMapTransform.Truncate: return null;
-                //case ESCAPE:
-                //case CAST:
-                //case APPEND:
-                case StructureMap.StructureMapTransform.Translate: return null;
-                //case DATEOP,
-                //case UUID,
-                //case POINTER,
-                //case EVALUATE,
-                case StructureMap.StructureMapTransform.Cc:
-                    CodeableConcept cc = new CodeableConcept(tgt.Parameter.First().Value.ToString(), tgt.Parameter[1].Value.ToString());
-                    return cc;
-                case StructureMap.StructureMapTransform.C:
-                    return buildCoding(tgt.Parameter.First().Value.ToString(), tgt.Parameter[1].Value.ToString());
-                case StructureMap.StructureMapTransform.Qty: return null;
-                //case ID,
-                //case CP,
-                default:
-                    return null;
-            }
-        }
-
-        private bool allParametersFixed(StructureMap.TargetComponent tgt)
-        {
-            foreach (var p in tgt.Parameter)
-            {
-                DataType pr = p.Value;
-                if (pr is Id)
-                    return false;
-            }
-            return true;
-        }
-
-        private string describeTransform(StructureMap.TargetComponent tgt)
-        {
-            switch (tgt.Transform)
-            {
-                case StructureMap.StructureMapTransform.Copy: return null;
-                case StructureMap.StructureMapTransform.Truncate: return null;
-                //case ESCAPE:
-                //case CAST:
-                //case APPEND:
-                case StructureMap.StructureMapTransform.Translate: return null;
-                //case DATEOP,
-                //case UUID,
-                //case POINTER,
-                //case EVALUATE,
-                case StructureMap.StructureMapTransform.Cc: return describeTransformCCorC(tgt);
-                case StructureMap.StructureMapTransform.C: return describeTransformCCorC(tgt);
-                case StructureMap.StructureMapTransform.Qty: return null;
-                //case ID,
-                //case CP,
-                default:
-                    return null;
-            }
-        }
-
-        // @SuppressWarnings("rawtypes")
-        private string describeTransformCCorC(StructureMap.TargetComponent tgt)
-        {
-            if (tgt.Parameter.Count() < 2)
-                return null;
-            DataType p1 = tgt.Parameter.First().Value;
-            DataType p2 = tgt.Parameter[1].Value;
-            if (p1 is Id || p2 is Id)
-                return null;
-            if (!(p1 is PrimitiveType) || !(p2 is PrimitiveType))
-                return null;
-            string uri = ((PrimitiveType)p1).ToString();
-            string code = ((PrimitiveType)p2).ToString();
-            if (Utilities.noString(uri))
-                throw new FHIRException("Describe Transform, but the uri is blank");
-            if (Utilities.noString(code))
-                throw new FHIRException("Describe Transform, but the code is blank");
-            Coding c = buildCoding(uri, code);
-            return NarrativeGenerator.describeSystem(c.System) + "#" + c.Code + (!string.IsNullOrEmpty(c.Display) ? "(" + c.Display + ")" : "");
-        }
-
-
-        private bool isSignificantElement(PropertyWithType property, string element)
-        {
-            if ("Observation".Equals(property.getPath()))
-                return "code".Equals(element);
-            else if ("Bundle".Equals(property.getPath()))
-                return "type".Equals(element);
-            else
-                return false;
-        }
-
-        private string getTransformSuffix(StructureMap.StructureMapTransform? transform)
-        {
-            switch (transform)
-            {
-                case StructureMap.StructureMapTransform.Copy: return "";
-                case StructureMap.StructureMapTransform.Truncate: return " (truncated)";
-                //case ESCAPE:
-                //case CAST:
-                //case APPEND:
-                case StructureMap.StructureMapTransform.Translate: return " (translated)";
-                //case DATEOP,
-                //case UUID,
-                //case POINTER,
-                //case EVALUATE,
-                case StructureMap.StructureMapTransform.Cc: return " (--> CodeableConcept)";
-                case StructureMap.StructureMapTransform.C: return " (--> Coding)";
-                case StructureMap.StructureMapTransform.Qty: return " (--> Quantity)";
-                //case ID,
-                //case CP,
-                default:
-                    return " {??)";
-            }
-        }
-
-        private PropertyWithType updateProfile(VariableForProfiling var, string element, TypeDetails type, StructureMap map, List<StructureDefinition> profiles, string sliceName, DataType fixedV, StructureMap.TargetComponent tgt)
-        {
-            if (var == null)
-            {
-                System.Diagnostics.Debug.Assert(Utilities.noString(element));
-                // 1. start the new structure definition
-                StructureDefinition sdn = worker.fetchResource<StructureDefinition>(type.getType());
-                if (sdn == null)
-                    throw new FHIRException("Unable to find definition for " + type.getType());
-                ElementDefinition edn = sdn.Snapshot.getElementFirstRep();
-                PropertyWithType pn = createProfile(map, profiles, new PropertyWithType(sdn.Id, new Property(worker, edn, sdn), null, type), sliceName, tgt);
-
-                //      // 2. hook it into the base bundle
-                //      if (type.Type.StartsWith("http://hl7.org/fhir/StructureDefinition/") && worker.getResourceNames().contains(type.Type.Substring(40))) {
-                //        StructureDefinition sd = var.getProperty().profileProperty.Structure;
-                //        ElementDefinition ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry");
-                //        ed.setName(sliceName);
-                //        ed.setMax("1"); // well, it is for now...
-                //        ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry.fullUrl");
-                //        ed.setMin(1);
-                //        ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry.resource");
-                //        ed.setMin(1);
-                //        ed.addType().setCode(pn.getProfileProperty().Structure.Type).setProfile(pn.getProfileProperty().Structure.Url);
-                //      }
-                return pn;
-            }
-            else
-            {
-                System.Diagnostics.Debug.Assert(!Utilities.noString(element));
-                Property pvb = var.getProperty().getBaseProperty();
-                Property pvd = var.getProperty().getProfileProperty();
-                Property pc = pvb.getChild(element, var.property.types);
-                if (pc == null)
-                    throw new DefinitionException("Unable to find a definition for " + pvb.getDefinition().Path + "." + element);
-
-                // the profile structure definition (derived)
-                StructureDefinition sd = var.getProperty().profileProperty.getStructure();
-                ElementDefinition ednew = new ElementDefinition();
-                sd.Differential.Element.Add(ednew);
-                ednew.Path = var.getProperty().profileProperty.getDefinition().Path + "." + pc.getName();
-                ednew.setUserData("slice-name", sliceName);
-                ednew.Fixed = fixedV;
-                foreach (var pt in type.getProfiledTypes())
-                {
-                    if (pt.hasBindings())
-                        ednew.Binding = pt.getBindings().First();
-                    if (pt.getUri().StartsWith("http://hl7.org/fhir/StructureDefinition/"))
-                    {
-                        string t = pt.getUri().Substring(40);
-                        t = checkType(t, pc, pt.getProfiles());
-                        if (t != null)
-                        {
-                            if (pt.hasProfiles())
-                            {
-                                foreach (string p in pt.getProfiles())
-                                    if (t.Equals("Reference"))
-                                        ednew.getType(t).TargetProfileElement.Add(p);
-                                    else
-                                        ednew.getType(t).ProfileElement.Add(p);
-                            }
-                            else
-                                ednew.getType(t);
-                        }
-                    }
-                }
-
-                return new PropertyWithType(var.property.path + "." + element, pc, new Property(worker, ednew, sd), type);
-            }
-        }
-
-        private string checkType(string t, Property pvb, List<string> profiles)
-        {
-            if (pvb.getDefinition().Type.Count() == 1 && isCompatibleType(t, pvb.getDefinition().Type.First().getWorkingCode()) && profilesMatch(profiles, pvb.getDefinition().Type.First().ProfileElement))
-                return null;
-            foreach (var tr in pvb.getDefinition().Type)
-            {
-                if (isCompatibleType(t, tr.getWorkingCode()))
-                    return tr.getWorkingCode(); // note what is returned - the base type, not the inferred mapping type
-            }
-            throw new FHIRException("The type " + t + " is not compatible with the allowed types for " + pvb.getDefinition().Path);
-        }
-
-        private bool profilesMatch(List<string> profiles, List<Canonical> profile)
-        {
-            return profiles == null || profiles.Count() == 0 || profile.Count() == 0 || (profiles.Count() == 1 && profiles.First().Equals(profile.First().Value));
-        }
-
-        private bool isCompatibleType(string t, string code)
-        {
-            if (t.Equals(code))
-                return true;
-            if (t.Equals("string"))
-            {
-                StructureDefinition sd = worker.fetchTypeDefinition(code);
-                if (sd != null && sd.BaseDefinition.Equals("http://hl7.org/fhir/StructureDefinition/string"))
-                    return true;
-            }
-            return false;
-        }
-
-        private TypeDetails analyseTransform(TransformContext context, StructureMap map, StructureMap.TargetComponent tgt, VariableForProfiling var, VariablesForProfiling vars)
-        {
-            switch (tgt.Transform)
-            {
-                case StructureMap.StructureMapTransform.Create:
-                    string p = getParamString(vars, tgt.Parameter.First());
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, p);
-
-                case StructureMap.StructureMapTransform.Copy:
-                    return getParam(vars, tgt.Parameter.First());
-
-                case StructureMap.StructureMapTransform.Evaluate:
-                    ExpressionNode expr = (ExpressionNode)tgt.getUserData(MAP_EXPRESSION);
-                    if (expr == null)
-                    {
-                        expr = fpe.parse(getParamString(vars, tgt.Parameter[tgt.Parameter.Count() - 1]));
-                        tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
-                    }
-                    return fpe.check(vars, null, expr);
-
-                ////case TRUNCATE :
-                ////  string src = getParamString(vars, tgt.Parameter.First());
-                ////  string len = getParamString(vars, tgt.Parameter[1]);
-                ////  if (Utilities.isInteger(len)) {
-                ////    int l = Integer.parseInt(len);
-                ////    if (src.length() > l)
-                ////      src = src.Substring(0, l);
-                ////  }
-                ////  return new FhirString(src);
-                ////case ESCAPE :
-                ////  throw new Exception("Transform "+tgt.Transform.toCode()+" not supported yet");
-                ////case CAST :
-                ////  throw new Exception("Transform "+tgt.Transform.toCode()+" not supported yet");
-                ////case APPEND :
-                ////  throw new Exception("Transform "+tgt.Transform.toCode()+" not supported yet");
-                case StructureMap.StructureMapTransform.Translate:
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, "CodeableConcept");
-                case StructureMap.StructureMapTransform.Cc:
-
-                    TypeDetails.ProfiledType res = new TypeDetails.ProfiledType("CodeableConcept");
-                    if (tgt.Parameter.Count() >= 2 && isParamId(vars, tgt.Parameter[1]))
-                    {
-                        TypeDetails td = vars.get(null, getParamId(vars, tgt.Parameter[1])).property.types;
-                        if (td != null && td.hasBinding())
-                            // todo: do we need to check that there's no implicit translation her? I don't think we do...
-                            res.addBinding(td.getBinding());
-                    }
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, res);
-                case StructureMap.StructureMapTransform.C:
-
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, "Coding");
-                case StructureMap.StructureMapTransform.Qty:
-
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, "Quantity");
-
-                case StructureMap.StructureMapTransform.Reference:
-                    VariableForProfiling vrs = vars.get(VariableMode.OUTPUT, getParamId(vars, tgt.getParameterFirstRep()));
-                    if (vrs == null)
-                        throw new FHIRException("Unable to resolve variable \"" + getParamId(vars, tgt.getParameterFirstRep()) + "\"");
-                    string profile = vrs.property.getProfileProperty().getStructure().Url;
-                    TypeDetails tdr = new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON);
-                    tdr.addType("Reference", profile);
-                    return tdr;
-
-                ////case DATEOP :
-                ////  throw new Exception("Transform "+tgt.Transform.toCode()+" not supported yet");
-                case StructureMap.StructureMapTransform.Uuid:
-                    return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, new TypeDetails.ProfiledType(FP_String));
-                ////case POINTER :
-                ////  Base b = getParam(vars, tgt.Parameter.First());
-                ////  if (b is Resource)
-                ////    return new UriType("urn:uuid:"+((Resource) b).Id);
-                ////  else
-                ////    throw new FHIRException("Transform engine cannot point at an element of type "+b.TypeName);
-                default:
-                    throw new Exception("Transform Unknown or not handled yet: " + tgt.Transform.GetLiteral());
             }
         }
 
@@ -2389,108 +2702,56 @@ namespace Hl7.Fhir.MappingLanguage
             return null;
         }
 
-        private string getParamId(VariablesForProfiling vars, StructureMap.ParameterComponent parameter)
-        {
-            DataType p = parameter.Value;
-            if (p == null || !(p is Id))
-                return null;
-            return p.ToString();
-        }
-
-        private bool isParamId(VariablesForProfiling vars, StructureMap.ParameterComponent parameter)
-        {
-            DataType p = parameter.Value;
-            if (p == null || !(p is Id))
-                return false;
-            return vars.get(null, p.ToString()) != null;
-        }
-
-        private TypeDetails getParam(VariablesForProfiling vars, StructureMap.ParameterComponent parameter)
-        {
-            DataType p = parameter.Value;
-            if (!(p is Id))
-                return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, ProfileUtilities.sdNs(p.TypeName, worker.getOverrideVersionNs()));
-            else
-            {
-                string n = ((Id)p).Value;
-                VariableForProfiling b = vars.get(VariableMode.INPUT, n);
-                if (b == null)
-                    b = vars.get(VariableMode.OUTPUT, n);
-                if (b == null)
-                    throw new DefinitionException("Variable " + n + " not found (" + vars.summary() + ")");
-                return b.getProperty().getTypes();
-            }
-        }
-
-        private PropertyWithType createProfile(StructureMap map, List<StructureDefinition> profiles, PropertyWithType prop, string sliceName, Base ctxt)
-        {
-            if (prop.getBaseProperty().getDefinition().Path.Contains("."))
-                throw new DefinitionException("Unable to process entry point");
-
-            string type = prop.getBaseProperty().getDefinition().Path;
-            string suffix = "";
-            if (ids.ContainsKey(type))
-            {
-                int id = ids[type];
-                id++;
-                ids.Add(type, id);
-                suffix = "-" + id.ToString();
-            }
-            else
-                ids.Add(type, 0);
-
-            StructureDefinition profile = new StructureDefinition();
-            profiles.Add(profile);
-            profile.Derivation = StructureDefinition.TypeDerivationRule.Constraint;
-            profile.Type = type;
-            profile.BaseDefinition = prop.getBaseProperty().getStructure().Url;
-            profile.Name = "Profile for " + profile.Type + " for " + sliceName;
-            profile.Url = map.Url.Replace("StructureMap", "StructureDefinition") + "-" + profile.Type + suffix;
-            ctxt.setUserData("profile", profile.Url); // then we can easily assign this profile url for validation later when we actually transform
-            profile.Id = map.Id + "-" + profile.Type + suffix;
-            profile.Status = map.Status;
-            profile.Experimental = map.Experimental;
-            profile.Description = new Markdown("Generated automatically from the mapping by the Java Reference Implementation");
-            profile.Contact = map.Contact.DeepCopy().ToList(); // contact property is the same datatype, so use the Firely SDK call
-            profile.Date = map.Date;
-            profile.Copyright = map.Copyright;
-            profile.FhirVersion = EnumUtility.ParseLiteral<FHIRVersion>(ModelInfo.Version);
-            profile.Kind = prop.getBaseProperty().getStructure().Kind;
-            profile.Abstract = false;
-            profile.Differential = new StructureDefinition.DifferentialComponent();
-
-            ElementDefinition ed = new ElementDefinition();
-            profile.Differential.Element.Add(ed);
-            ed.Path = profile.Type;
-
-            prop.profileProperty = new Property(worker, ed, profile);
-            return prop;
-        }
-
-        private PropertyWithType resolveType(StructureMap map, string type, StructureMap.StructureMapInputMode? mode)
-        {
-            foreach (StructureMap.StructureComponent imp in map.Structure)
-            {
-                if ((imp.Mode == StructureMap.StructureMapModelMode.Source && mode == StructureMap.StructureMapInputMode.Source) ||
-                    (imp.Mode == StructureMap.StructureMapModelMode.Target && mode == StructureMap.StructureMapInputMode.Target))
-                {
-                    StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
-                    if (sd == null)
-                        throw new FHIRException("Import " + imp.Url + " cannot be resolved");
-                    // TODO: BRIAN Verify why this if test exists (doesn't make any sense)
-                    // if (sd.Id.Equals(type))
-                    {
-                        return new PropertyWithType(sd.Type, new Property(worker, sd.Snapshot.Element.First(), sd), null, new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, sd.Url));
-                    }
-                }
-            }
-            throw new FHIRException("Unable to find structure definition for " + type + " in imports");
-        }
-
 
         private string tail(string url)
         {
             return url.Substring(url.LastIndexOf("/") + 1);
         }
+
+
+        private void addChildMappings(StringBuilder b, string id, string indent, StructureDefinition sd, ElementDefinition ed, bool inner)
+        {
+            bool first = true;
+            List<ElementDefinition> children = ProfileUtilities.getChildMap(sd, ed);
+            foreach (ElementDefinition child in children)
+            {
+                if (first && inner)
+                {
+                    b.Append(" then {\r\n");
+                    first = false;
+                }
+                string map = getMapping(child, id);
+                if (map != null)
+                {
+                    b.Append(indent + "  " + child.Path + ": " + map);
+                    addChildMappings(b, id, indent + "  ", sd, child, true);
+                    b.AppendLine();
+                }
+            }
+            if (!first && inner)
+                b.Append(indent + "}");
+
+        }
+
+
+        private string getMapping(ElementDefinition ed, string id)
+        {
+            foreach (var map in ed.Mapping)
+                if (id.Equals(map.Identity))
+                    return map.Map;
+            return null;
+        }
+
+
+        public TerminologyServiceOptions getTerminologyServiceOptions()
+        {
+            return terminologyServiceOptions;
+        }
+
+        public void setTerminologyServiceOptions(TerminologyServiceOptions terminologyServiceOptions)
+        {
+            this.terminologyServiceOptions = terminologyServiceOptions;
+        }
+
     }
 }
