@@ -166,6 +166,15 @@ namespace Hl7.Fhir.MappingLanguage
             return s.Substring(0, 1).ToLower() + s.Substring(1);
         }
 
+        public static string uncapitalize(string s)
+        {
+            if (s == null) return null;
+            if (s.Length == 0) return s;
+            if (s.Length == 1) return s.ToLower();
+
+            return s.Substring(0, 1).ToLower() + s.Substring(1);
+        }
+
         internal static bool isAbsoluteUrl(string n)
         {
             if (n != null && n.Contains(":"))
@@ -176,6 +185,33 @@ namespace Hl7.Fhir.MappingLanguage
                     && details != null && details.Length > 0 && !details.Contains(" "); // rfc5141
             }
             return false;
+        }
+
+        public static string pathURL(params string[] args)
+        {
+            StringBuilder s = new StringBuilder();
+            bool d = false;
+            foreach (string arg in args)
+            {
+                if (arg != null)
+                {
+                    if (!d)
+                        d = !noString(arg);
+                    else if (s.ToString() != null && !s.ToString().EndsWith("/") && !arg.StartsWith("/"))
+                        s.Append("/");
+                    s.Append(arg);
+                }
+            }
+            return s.ToString();
+        }
+
+        public static int charCount(string s, char c)
+        {
+            int res = 0;
+            foreach (char ch in s.ToCharArray())
+                if (ch == c)
+                    res++;
+            return res;
         }
     }
 }

@@ -30,14 +30,43 @@
 // Portions ported from/compatible with https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/model/StructureMap.java
 
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal;
+using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
+using static Hl7.Fhir.Model.ElementDefinition;
 
 namespace Hl7.Fhir.MappingLanguage
 {
+    public class CommaSeparatedStringBuilder
+    {
+        private StringBuilder _sb = new StringBuilder();
+
+        public override string ToString()
+        {
+            return _sb.ToString();
+        }
+
+        internal void append(string value)
+        {
+            if (_sb.Length > 0)
+                _sb.Append(",");
+            _sb.Append(value);
+        }
+    }
+
+    public class ProfileKnowledgeProvider
+    {
+
+    }
+
+    public class TerminologyServiceOptions
+    {
+
+    }
+
     public class DotnetFhirPathEngineEnvironment : IEvaluationContext
     {
         public TypeDetails checkFunction(object appContext, string functionName, List<TypeDetails> parameters)
@@ -89,6 +118,33 @@ namespace Hl7.Fhir.MappingLanguage
         }
     }
 
+    public class PathEngineException : FHIRException
+    {
+        public SourceLocation Location { get; private set; }
+        public string Expression { get; private set; }
+
+        public PathEngineException()
+        {
+        }
+
+        public PathEngineException(string message, Exception cause)
+            : base(message, cause)
+        {
+        }
+
+        public PathEngineException(string message)
+            : base(message)
+        {
+        }
+
+        public PathEngineException(string message, SourceLocation location, string expression)
+            : base(message)
+        {
+            Location = location;
+            Expression = expression;
+        }
+    }
+
     public class DefinitionException : FHIRException
     {
         public DefinitionException()
@@ -106,8 +162,100 @@ namespace Hl7.Fhir.MappingLanguage
         }
     }
 
+    internal static class ToolingExtensions
+    {
+        // https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/ToolingExtensions.java
+        public const string EXT_FHIR_TYPE = "http://hl7.org/fhir/StructureDefinition/structuredefinition-fhir-type";
+        public const string EXT_XML_TYPE = "http://hl7.org/fhir/StructureDefinition/structuredefinition-xml-type";
+        public const string EXT_JSON_TYPE = "http://hl7.org/fhir/StructureDefinition/structuredefinition-json-type";
+    }
+
     internal static class StructureMapExtensions
     {
+        private class MapperUserData
+        {
+            public Dictionary<string, object> data = new Dictionary<string, object>();
+        }
+
+        public static void setUserData(this IAnnotated me, string key, object value)
+        {
+            if (me.TryGetAnnotation<MapperUserData>(out MapperUserData data))
+            {
+                data.data[key] = value;
+                return;
+            }
+            if (me is IAnnotatable a)
+            {
+                var ud = new MapperUserData();
+                ud.data[key] = value;
+                a.SetAnnotation(ud);
+            }
+        }
+
+        public static object getUserData(this IAnnotated me, string key)
+        {
+            if (me.TryGetAnnotation<MapperUserData>(out MapperUserData data))
+            {
+                return data.data[key];
+            }
+            return null;
+        }
+
+        public static string getWorkingCode(this ElementDefinition.TypeRefComponent me)
+        {
+            var fhirTypeInExtension = me.GetStringExtension(ToolingExtensions.EXT_FHIR_TYPE);
+            if (!string.IsNullOrEmpty(fhirTypeInExtension))
+                return fhirTypeInExtension;
+            if (me.CodeElement == null)
+                return null;
+            String s = me.CodeElement.GetStringExtension(ToolingExtensions.EXT_XML_TYPE);
+            if (!string.IsNullOrEmpty(s))
+            {
+                if ("xsd:gYear OR xsd:gYearMonth OR xsd:date OR xsd:dateTime".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "dateTime";
+                if ("xsd:gYear OR xsd:gYearMonth OR xsd:date".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "date";
+                if ("xsd:dateTime".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "instant";
+                if ("xsd:token".Equals(s))
+                    return "code";
+                if ("xsd:boolean".Equals(s))
+                    return "boolean";
+                if ("xsd:string".Equals(s))
+                    return "string";
+                if ("xsd:time".Equals(s))
+                    return "time";
+                if ("xsd:int".Equals(s))
+                    return "integer";
+                if ("xsd:decimal OR xsd:double".Equals(s))
+                    return "decimal";
+                if ("xsd:decimal".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "decimal";
+                if ("xsd:base64Binary".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "base64Binary";
+                if ("xsd:positiveInteger".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "positiveInt";
+                if ("xsd:nonNegativeInteger".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "unsignedInt";
+                if ("xsd:anyURI".Equals(s, StringComparison.InvariantCultureIgnoreCase))
+                    return "uri";
+
+                throw new FHIRException("Unknown xml type '" + s + "'");
+            }
+            return me.Code;
+        }
+
+        public static TypeRefComponent getType(this ElementDefinition me, String code)
+        {
+            foreach (var tr in me.Type)
+                if (tr.Code.Equals(code))
+                    return tr;
+            TypeRefComponent newTref = new TypeRefComponent();
+            newTref.Code = code;
+            me.Type.Add(newTref);
+            return newTref;
+        }
+
         public static StructureMap.SourceComponent getSourceFirstRep(this StructureMap.RuleComponent r)
         {
             if (r.Source.Any())
@@ -149,6 +297,24 @@ namespace Hl7.Fhir.MappingLanguage
             var newParameter = new StructureMap.ParameterComponent();
             target.Parameter.Add(newParameter);
             return newParameter;
+        }
+
+        public static StructureMap.ParameterComponent getParameterFirstRep(this StructureMap.TargetComponent me)
+        {
+            if (me.Parameter.Any())
+                return me.Parameter.First();
+            var newParameter = new StructureMap.ParameterComponent();
+            me.Parameter.Add(newParameter);
+            return newParameter;
+        }
+
+        public static bool hasRepresentation(this ElementDefinition me, PropertyRepresentation repType)
+        {
+            if (!me.Representation.Any())
+                return false;
+            if (me.Representation.Any(r => r.Value == repType))
+                return true;
+            return false;
         }
     }
 }
