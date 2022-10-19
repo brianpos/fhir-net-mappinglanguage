@@ -32,16 +32,28 @@
 using Hl7.Fhir.Model;
 using System;
 using System.Collections.Generic;
-using static Hl7.Fhir.Model.ElementDefinition;
 using System.Linq;
+using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
+using static Hl7.Fhir.Model.ElementDefinition;
 
 namespace Hl7.Fhir.MappingLanguage
 {
+    public class ValidationMessage
+    {
+
+    }
+
     public class ProfileUtilities
     {
+        IWorkerContext context;
+        public ProfileUtilities(IWorkerContext context, List<ValidationMessage> messages, ProfileKnowledgeProvider pkp)
+        {
+            this.context = context;
+        }
+
         private static Dictionary<ElementDefinition, List<ElementDefinition>> childMapCache = new Dictionary<ElementDefinition, List<ElementDefinition>>();
 
-        public static List<ElementDefinition> getChildMap(StructureDefinition profile, ElementDefinition element)
+        public static List<ElementDefinition> getChildMap(IWorkerContext context, StructureDefinition profile, ElementDefinition element)
         {
             if (childMapCache.ContainsKey(element))
             {
@@ -77,10 +89,10 @@ namespace Hl7.Fhir.MappingLanguage
                 foreach (ElementDefinition e in list)
                 {
                     if (id.Equals(e.ElementId))
-                        return getChildMap(profile, e);
+                        return getChildMap(context, profile, e);
                 }
-                throw new DefinitionException(context.formatMessage(I18nConstants.UNABLE_TO_RESOLVE_NAME_REFERENCE__AT_PATH_, element.ContentReference, element.Path));
-
+                // throw new DefinitionException(context.formatMessage(I18nConstants.UNABLE_TO_RESOLVE_NAME_REFERENCE__AT_PATH_, element.ContentReference, element.Path));
+                throw new DefinitionException($"Unable to resolve NAME_REFERENCE {element.ContentReference} at {element.Path}");
             }
             else
             {

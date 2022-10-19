@@ -288,7 +288,7 @@ namespace Hl7.Fhir.MappingLanguage
         {
             ElementDefinition ed = definition;
             StructureDefinition sd = structure;
-            List<ElementDefinition> children = ProfileUtilities.getChildMap(sd, ed);
+            List<ElementDefinition> children = ProfileUtilities.getChildMap(context, sd, ed);
             String url = null;
             if (children.IsNullOrEmpty() || isElementWithOnlyExtension(ed, children))
             {
@@ -371,7 +371,7 @@ namespace Hl7.Fhir.MappingLanguage
                     sd = context.fetchResource<StructureDefinition>(url);
                     if (sd == null)
                         throw new DefinitionException("Unable to find type '" + t + "' for name '" + elementName + "' on property " + definition.Path);
-                    children = ProfileUtilities.getChildMap(sd, sd.Snapshot.Element[0]);
+                    children = ProfileUtilities.getChildMap(context, sd, sd.Snapshot.Element[0]);
                 }
             }
             List<Property> properties = new List<Property>();
@@ -386,7 +386,7 @@ namespace Hl7.Fhir.MappingLanguage
         {
             ElementDefinition ed = definition;
             StructureDefinition sd = structure;
-            List<ElementDefinition> children = ProfileUtilities.getChildMap(sd, ed);
+            List<ElementDefinition> children = ProfileUtilities.getChildMap(context, sd, ed);
             if (!children.Any())
             {
                 // ok, find the right definitions
@@ -418,7 +418,7 @@ namespace Hl7.Fhir.MappingLanguage
                     sd = context.fetchResource<StructureDefinition>(t);
                     if (sd == null)
                         throw new DefinitionException("Unable to find class '" + t + "' for name '" + ed.Path + "' on property " + definition.Path);
-                    children = ProfileUtilities.getChildMap(sd, sd.Snapshot.Element[0]);
+                    children = ProfileUtilities.getChildMap(context, sd, sd.Snapshot.Element[0]);
                 }
             }
             List<Property> properties = new List<Property>();

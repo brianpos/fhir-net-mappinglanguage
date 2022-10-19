@@ -30,26 +30,67 @@
 // Port (partial) from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/FHIRPathEngine.java
 // The execution engine was not ported (will use the Firely SDK version)
 
+using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using static Hl7.Fhir.MappingLanguage.ExpressionNode;
+using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal;
+using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
+using static Hl7.Fhir.MappingLanguage.TypeDetails;
+using static Hl7.Fhir.Model.ElementDefinition;
 
 namespace Hl7.Fhir.MappingLanguage
 {
     internal class FHIRPathEngine
     {
+        FHIRPathEngineOriginal _engine;
         public FHIRPathEngine()
         {
+            _engine = new FHIRPathEngineOriginal(null);
+        }
+
+        public FHIRPathEngine(IWorkerContext worker)
+        {
+            _engine = new FHIRPathEngineOriginal(worker);
         }
 
         internal ExpressionNode parse(FHIRLexer lexer)
         {
-            FHIRPathEngineOriginal engine = new FHIRPathEngineOriginal();
-            engine.setHostServices(new DotnetFhirPathEngineEnvironment());
-            return engine.parse(lexer);
+            _engine.setHostServices(new DotnetFhirPathEngineEnvironment());
+            return _engine.parse(lexer);
+        }
+
+        public ExpressionNode parse(String path)
+        {
+            _engine.setHostServices(new DotnetFhirPathEngineEnvironment());
+            return _engine.parse(path);
+        }
+
+        public ExpressionNode parse(String path, String name)
+        {
+            _engine.setHostServices(new DotnetFhirPathEngineEnvironment());
+            return _engine.parse(path, name);
+        }
+
+        public IEvaluationContext getHostServices()
+        {
+            return _engine.getHostServices();
+        }
+
+
+        public void setHostServices(IEvaluationContext constantResolver)
+        {
+            _engine.setHostServices(constantResolver);
+        }
+
+        internal TypeDetails check(VariablesForProfiling vars, object value, ExpressionNode expr)
+        {
+            // TODO: BRIAN recheck the params here, quite the disconnect
+            return _engine.check(vars, null, null, expr);
         }
     }
 
@@ -60,6 +101,7 @@ namespace Hl7.Fhir.MappingLanguage
      */
     public class FHIRPathEngineOriginal
     {
+        public const String NS_SYSTEM_TYPE = "http://hl7.org/fhirpath/System.";
         private enum Equality { Null, True, False }
 
         /// <summary>
@@ -74,6 +116,7 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
         private IEvaluationContext hostServices;
+        private IWorkerContext worker;
         private StringBuilder _log = new StringBuilder();
 
         public class FunctionDetails
@@ -171,8 +214,9 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        public FHIRPathEngineOriginal()
+        public FHIRPathEngineOriginal(IWorkerContext worker)
         {
+            this.worker = worker;
         }
 
 
@@ -237,6 +281,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
 
         }
+
         /**
          * Parse a path for later use using execute
          *
@@ -743,6 +788,413 @@ namespace Hl7.Fhir.MappingLanguage
             }
             return b.ToString();
         }
-    }
 
+        private class ExecutionTypeContext
+        {
+            private Object appInfo;
+            private String resource;
+            private TypeDetails context;
+            private TypeDetails thisItem;
+            private TypeDetails total;
+
+
+            public ExecutionTypeContext(Object appInfo, string resource, TypeDetails context, TypeDetails thisItem)
+            {
+                this.appInfo = appInfo;
+                this.resource = resource;
+                this.context = context;
+                this.thisItem = thisItem;
+
+            }
+            public string getResource()
+            {
+                return resource;
+            }
+            public TypeDetails getThisItem()
+            {
+                return thisItem;
+            }
+        }
+
+
+        public TypeDetails check(Object appContext, string resourceType, string context, ExpressionNode expr)
+        {
+            // if context is a path that refers to a type, do that conversion now
+            TypeDetails types;
+            if (context == null)
+            {
+                types = null; // this is a special case; the first path reference will have to resolve to something in the context
+            }
+            else if (!context.Contains("."))
+            {
+                StructureDefinition sd = worker.fetchResource<StructureDefinition>(context);
+                types = new TypeDetails(CollectionStatus.SINGLETON, sd.Url);
+            }
+            else
+            {
+                string ctxt = context.Substring(0, context.IndexOf('.'));
+                if (Utilities.isAbsoluteUrl(resourceType))
+                {
+                    ctxt = resourceType.Substring(0, resourceType.LastIndexOf("/") + 1) + ctxt;
+                }
+                StructureDefinition sd = worker.fetchResource<StructureDefinition>(ctxt);
+                if (sd == null)
+                    throw new PathEngineException("Unknown context " + context, expr.getStart(), expr.ToString());
+                ElementDefinitionMatch ed = getElementDefinition(sd, context, true, expr);
+                if (ed == null)
+                    throw new PathEngineException("Unknown context element " + context, expr.getStart(), expr.ToString());
+                if (ed.getFixedType() != null)
+                    types = new TypeDetails(CollectionStatus.SINGLETON, ed.getFixedType());
+                else if (!ed.getDefinition().Type.Any() || isAbstractType(ed.getDefinition().Type))
+                    types = new TypeDetails(CollectionStatus.SINGLETON, ctxt + "#" + context);
+                else
+                {
+                    types = new TypeDetails(CollectionStatus.SINGLETON);
+                    foreach (var t in ed.getDefinition().Type)
+                        types.addType(t.Code);
+                }
+            }
+            return executeType(new ExecutionTypeContext(appContext, resourceType, types, types), types, expr, true);
+        }
+
+        public class ElementDefinitionMatch
+        {
+            private ElementDefinition definition;
+            private string fixedType;
+            public ElementDefinitionMatch(ElementDefinition definition, string fixedType)
+            {
+                this.definition = definition;
+                this.fixedType = fixedType;
+            }
+            public ElementDefinition getDefinition()
+            {
+                return definition;
+            }
+            public string getFixedType()
+            {
+                return fixedType;
+            }
+
+        }
+        private ElementDefinitionMatch getElementDefinitionById(StructureDefinition sd, string refVal)
+        {
+            foreach (ElementDefinition ed in sd.Snapshot.Element)
+            {
+                if (refVal.Equals("#" + ed.ElementId))
+                    return new ElementDefinitionMatch(ed, null);
+            }
+            return null;
+        }
+
+        private ElementDefinitionMatch getElementDefinition(StructureDefinition sd, string path, bool allowTypedName, ExpressionNode expr)
+        {
+            foreach (ElementDefinition ed in sd.Snapshot.Element)
+            {
+                if (ed.Path.Equals(path))
+                {
+                    if (!string.IsNullOrEmpty(ed.ContentReference))
+                    {
+                        return getElementDefinitionById(sd, ed.ContentReference);
+                    }
+                    else
+                        return new ElementDefinitionMatch(ed, null);
+                }
+                if (ed.Path.EndsWith("[x]") && path.StartsWith(ed.Path.Substring(0, ed.Path.Length - 3)) && path.Length == ed.Path.Length - 3)
+                    return new ElementDefinitionMatch(ed, null);
+                if (allowTypedName && ed.Path.EndsWith("[x]") && path.StartsWith(ed.Path.Substring(0, ed.Path.Length - 3)) && path.Length > ed.Path.Length - 3)
+                {
+                    string s = Utilities.uncapitalize(path.Substring(ed.Path.Length - 3));
+                    // if (primitiveTypes.contains(s))
+                    if (ModelInfo.IsPrimitive(s))
+                        return new ElementDefinitionMatch(ed, s);
+                    else
+                        return new ElementDefinitionMatch(ed, path.Substring(ed.Path.Length - 3));
+                }
+                if (ed.Path.Contains(".") && path.StartsWith(ed.Path + ".") && (ed.Type.Count() > 0) && !isAbstractType(ed.Type))
+                {
+                    // now we walk into the type.
+                    if (ed.Type.Count() > 1)  // if there's more than one type, the test above would fail this
+                        throw new PathEngineException("Internal typing issue....", expr.getStart(), expr.ToString());
+                    StructureDefinition nsd = worker.fetchResource<StructureDefinition>(ProfileUtilities.sdNs(ed.Type[0].Code, worker.getOverrideVersionNs()));
+                    if (nsd == null)
+                        throw new PathEngineException("Unknown type " + ed.Type[0].Code, expr.getStart(), expr.ToString());
+                    return getElementDefinition(nsd, nsd.Id + path.Substring(ed.Path.Length), allowTypedName, expr);
+                }
+                if (!string.IsNullOrEmpty(ed.ContentReference) && path.StartsWith(ed.Path + "."))
+                {
+                    ElementDefinitionMatch m = getElementDefinitionById(sd, ed.ContentReference);
+                    return getElementDefinition(sd, m.getDefinition().Path + path.Substring(ed.Path.Length), allowTypedName, expr);
+                }
+            }
+            return null;
+        }
+
+        private bool isAbstractType(List<TypeRefComponent> list)
+        {
+            return list.Count() != 1 ? true : Utilities.existsInList(list[0].Code, "Element", "BackboneElement", "Resource", "DomainResource");
+        }
+
+        private TypeDetails executeType(ExecutionTypeContext context, TypeDetails focus, ExpressionNode exp, bool atEntry)
+        {
+            // TODO: BRIAN Nothing in this function should be commented out
+            //       Was done to get compiling so could move into testing
+            TypeDetails result = new TypeDetails(null);
+            switch (exp.getKind())
+            {
+                case Kind.Name:
+                    if (atEntry && exp.getName().Equals("$this"))
+                        result.update(context.getThisItem());
+                    //else if (atEntry && exp.getName().Equals("$total"))
+                    //    result.update(anything(CollectionStatus.UNORDERED));
+                    //else if (atEntry && focus == null)
+                    //    result.update(executeContextType(context, exp.getName(), exp));
+                    else
+                    {
+                        foreach (string s in focus.getTypes())
+                        {
+                            result.update(executeType(s, exp, atEntry));
+                        }
+                        if (result.hasNoTypes())
+                            throw new PathEngineException("The name " + exp.getName() + " is not valid for any of the possible types: " + focus.describe(), exp.getStart(), exp.ToString());
+                    }
+                    break;
+
+                //case Kind.Function:
+                //    result.update(evaluateFunctionType(context, focus, exp));
+                //    break;
+
+                case Kind.Unary:
+                    result.addType("integer");
+                    break;
+
+                //case Kind.Constant:
+                //    result.update(resolveConstantType(context, exp.getConstant(), exp));
+                //    break;
+
+                case Kind.Group:
+                    result.update(executeType(context, focus, exp.getGroup(), atEntry));
+                    break;
+            }
+            exp.setTypes(result);
+
+            if (exp.getInner() != null)
+            {
+                result = executeType(context, result, exp.getInner(), false);
+            }
+
+            //if (exp.isProximal() && exp.getOperation() != null)
+            //{
+            //    ExpressionNode next = exp.getOpNext();
+            //    ExpressionNode last = exp;
+            //    while (next != null)
+            //    {
+            //        TypeDetails work;
+            //        if (last.getOperation() == Operation.Is || last.getOperation() == Operation.As)
+            //            work = executeTypeName(context, focus, next, atEntry);
+            //        else
+            //            work = executeType(context, focus, next, atEntry);
+            //        result = operateTypes(result, last.getOperation(), work, exp);
+            //        last = next;
+            //        next = next.getOpNext();
+            //    }
+            //    exp.setOpTypes(result);
+            //}
+            return result;
+        }
+
+        private TypeDetails executeType(String type, ExpressionNode exp, bool atEntry)
+        {
+            if (atEntry && char.IsUpper(exp.getName()[0]) && hashTail(type).Equals(exp.getName())) // special case for start up
+                return new TypeDetails(CollectionStatus.SINGLETON, type);
+            TypeDetails result = new TypeDetails(null);
+            getChildTypesByName(type, exp.getName(), result, exp);
+            return result;
+        }
+
+        private String hashTail(String type)
+        {
+            return type.Contains("#") ? "" : type.Substring(type.LastIndexOf("/") + 1);
+        }
+
+        private void getChildTypesByName(String type, String name, TypeDetails result, ExpressionNode expr)
+        {
+            if (Utilities.noString(type))
+                throw new PathEngineException("No type provided in BuildToolPathEvaluator.getChildTypesByName", expr.getStart(), expr.ToString());
+            if (type.Equals("http://hl7.org/fhir/StructureDefinition/xhtml"))
+                return;
+            if (type.StartsWith(NS_SYSTEM_TYPE))
+                return;
+
+            if (type.Equals(TypeDetails.FP_SimpleTypeInfo))
+            {
+                getSimpleTypeChildTypesByName(name, result);
+            }
+            else if (type.Equals(TypeDetails.FP_ClassInfo))
+            {
+                getClassInfoChildTypesByName(name, result);
+            }
+            else
+            {
+                String url = null;
+                if (type.Contains("#"))
+                {
+                    url = type.Substring(0, type.IndexOf("#"));
+                }
+                else
+                {
+                    url = type;
+                }
+                String tail = "";
+                StructureDefinition sd = worker.fetchResource<StructureDefinition>(url);
+                if (sd == null)
+                    throw new DefinitionException("Unknown type " + type); // this really is an error, because we can only get to here if the internal infrastrucgture is wrong
+                List<StructureDefinition> sdl = new List<StructureDefinition>();
+                ElementDefinitionMatch m = null;
+                if (type.Contains("#"))
+                    m = getElementDefinition(sd, type.Substring(type.IndexOf("#") + 1), false, expr);
+                if (m != null && hasDataType(m.getDefinition()))
+                {
+                    if (m.getFixedType() != null)
+                    {
+                        StructureDefinition dt = worker.fetchResource<StructureDefinition>(ProfileUtilities.sdNs(m.getFixedType(), worker.getOverrideVersionNs()));
+                        if (dt == null)
+                            throw new DefinitionException("unknown data type " + m.getFixedType());
+                        sdl.Add(dt);
+                    }
+                    else
+                        foreach (TypeRefComponent t in m.getDefinition().Type)
+                        {
+                            StructureDefinition dt = worker.fetchResource<StructureDefinition>(ProfileUtilities.sdNs(t.Code, worker.getOverrideVersionNs()));
+                            if (dt == null)
+                                throw new DefinitionException("unknown data type " + t.Code);
+                            sdl.Add(dt);
+                        }
+                }
+                else
+                {
+                    sdl.Add(sd);
+                    if (type.Contains("#"))
+                    {
+                        tail = type.Substring(type.IndexOf("#") + 1);
+                        tail = tail.Substring(tail.IndexOf("."));
+                    }
+                }
+
+                foreach (StructureDefinition sdi in sdl)
+                {
+                    String path = sdi.Snapshot.Element[0].Path + tail + ".";
+                    if (name.Equals("**"))
+                    {
+                        System.Diagnostics.Debug.Assert(result.getCollectionStatus() == CollectionStatus.UNORDERED);
+                        foreach (ElementDefinition ed in sdi.Snapshot.Element)
+                        {
+                            if (ed.Path.StartsWith(path))
+                                foreach (TypeRefComponent t in ed.Type)
+                                {
+                                    if (!string.IsNullOrEmpty(t.Code))
+                                    {
+                                        String tn = null;
+                                        if (t.Code.Equals("Element") || t.Code.Equals("BackboneElement"))
+                                            tn = sdi.Type + "#" + ed.Path;
+                                        else
+                                            tn = t.Code;
+                                        if (t.Code.Equals("Resource"))
+                                        {
+                                            foreach (String rn in ModelInfo.SupportedResources) // TODO: BRIAN this should be from the worker that has the supported types in it
+                                            {
+                                                if (!result.hasType(worker, rn))
+                                                {
+                                                    getChildTypesByName(result.addType(rn), "**", result, expr);
+                                                }
+                                            }
+                                        }
+                                        else if (!result.hasType(worker, tn))
+                                        {
+                                            getChildTypesByName(result.addType(tn), "**", result, expr);
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                    else if (name.Equals("*"))
+                    {
+                        System.Diagnostics.Debug.Assert(result.getCollectionStatus() == CollectionStatus.UNORDERED);
+                        foreach (ElementDefinition ed in sdi.Snapshot.Element)
+                        {
+                            if (ed.Path.StartsWith(path) && !ed.Path.Substring(path.Length).Contains("."))
+                                foreach (TypeRefComponent t in ed.Type)
+                                {
+                                    if (Utilities.noString(t.Code)) // Element.id or Extension.url
+                                        result.addType("System.string");
+                                    else if (t.Code.Equals("Element") || t.Code.Equals("BackboneElement"))
+                                        result.addType(sdi.Type + "#" + ed.Path);
+                                    else if (t.Code.Equals("Resource"))
+                                        result.addTypes(ModelInfo.SupportedResources); // TODO: BRIAN this should be from the worker that has the supported types in it worker.getResourceNames());
+                                    else
+                                        result.addType(t.Code);
+                                }
+                        }
+                    }
+                    else
+                    {
+                        path = sdi.Snapshot.Element[0].Path + tail + "." + name;
+
+                        ElementDefinitionMatch ed = getElementDefinition(sdi, path, false, expr);
+                        if (ed != null)
+                        {
+                            if (!Utilities.noString(ed.getFixedType()))
+                                result.addType(ed.getFixedType());
+                            else
+                                foreach (TypeRefComponent t in ed.getDefinition().Type)
+                                {
+                                    if (Utilities.noString(t.Code))
+                                    {
+                                        if (Utilities.existsInList(ed.getDefinition().ElementId, "Element.id", "Extension.url") || Utilities.existsInList(ed.getDefinition().Base.Path, "Resource.id", "Element.id", "Extension.url"))
+                                            result.addType(TypeDetails.FP_NS, "string");
+                                        break; // throw new PathEngineException("Illegal reference to primitive value attribute @ "+path);
+                                    }
+
+                                    ProfiledType pt = null;
+                                    if (t.Code.Equals("Element") || t.Code.Equals("BackboneElement"))
+                                        pt = new ProfiledType(sdi.Url + "#" + path);
+                                    else if (t.Code.Equals("Resource"))
+                                        result.addTypes(ModelInfo.SupportedResources); // TODO: BRIAN this should be from the worker that has the supported types in it worker.getResourceNames());
+                                    else
+                                        pt = new ProfiledType(t.Code);
+                                    if (pt != null)
+                                    {
+                                        if (t.ProfileElement.Any())
+                                            pt.addProfiles(t.ProfileElement);
+                                        if (ed.getDefinition().Binding != null)
+                                            pt.addBinding(ed.getDefinition().Binding);
+                                        result.addType(pt);
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool hasDataType(ElementDefinition ed)
+        {
+            return ed.Type.Any() && !(ed.Type[0].Code.Equals("Element") || ed.Type[0].Code.Equals("BackboneElement"));
+        }
+
+        private void getClassInfoChildTypesByName(String name, TypeDetails result)
+        {
+            if (name.Equals("namespace"))
+                result.addType(TypeDetails.FP_String);
+            if (name.Equals("name"))
+                result.addType(TypeDetails.FP_String);
+        }
+
+        private void getSimpleTypeChildTypesByName(String name, TypeDetails result)
+        {
+            if (name.Equals("namespace"))
+                result.addType(TypeDetails.FP_String);
+            if (name.Equals("name"))
+                result.addType(TypeDetails.FP_String);
+        }
+    }
 }

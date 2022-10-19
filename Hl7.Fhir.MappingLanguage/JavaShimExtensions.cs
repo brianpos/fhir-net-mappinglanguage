@@ -201,6 +201,15 @@ namespace Hl7.Fhir.MappingLanguage
             return null;
         }
 
+        public static bool hasUserData(this IAnnotated me, string key)
+        {
+            if (me.TryGetAnnotation<MapperUserData>(out MapperUserData data))
+            {
+                return data.data[key] != null;
+            }
+            return false;
+        }
+
         public static string getWorkingCode(this ElementDefinition.TypeRefComponent me)
         {
             var fhirTypeInExtension = me.GetStringExtension(ToolingExtensions.EXT_FHIR_TYPE);
@@ -315,6 +324,15 @@ namespace Hl7.Fhir.MappingLanguage
             if (me.Representation.Any(r => r.Value == repType))
                 return true;
             return false;
+        }
+
+        public static ElementDefinition.SlicingComponent getSlicing(this ElementDefinition me)
+        {
+            // refer to notes here if there are issues with this auto-creation
+            // https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/model/Configuration.java
+            if (me.Slicing == null)
+                me.Slicing = new ElementDefinition.SlicingComponent();
+            return me.Slicing;
         }
     }
 }

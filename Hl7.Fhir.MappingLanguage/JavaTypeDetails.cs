@@ -35,6 +35,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using static Hl7.Fhir.MappingLanguage.ExpressionNode;
+using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
 using static Hl7.Fhir.Model.ElementDefinition;
 
 namespace Hl7.Fhir.MappingLanguage
@@ -194,58 +195,58 @@ namespace Hl7.Fhir.MappingLanguage
             types.Add(pt);
         }
 
-        public void addTypes(Collection<String> names)
+        public void addTypes(IEnumerable<String> names)
         {
             foreach (String n in names)
                 addType(new ProfiledType(n));
         }
 
-        //public bool hasType(IWorkerContext context, params string[] tn)
-        //{
-        //    foreach (String n in tn)
-        //    {
-        //        String t = ProfiledType.ns(n);
-        //        if (typesContains(t))
-        //            return true;
-        //        if (Utilities.existsInList(n, "bool", "string", "integer", "decimal", "Quantity", "dateTime", "time", "ClassInfo", "SimpleTypeInfo"))
-        //        {
-        //            t = FP_NS + Utilities.capitalize(n);
-        //            if (typesContains(t))
-        //                return true;
-        //        }
-        //    }
-        //    foreach (String n in tn)
-        //    {
-        //        String id = n.Contains("#") ? n.Substring(0, n.IndexOf("#")) : n;
-        //        String tail = null;
-        //        if (n.Contains("#"))
-        //        {
-        //            tail = n.Substring(n.IndexOf("#") + 1);
-        //            tail = tail.Substring(tail.IndexOf("."));
-        //        }
-        //        String t = ProfiledType.ns(n);
-        //        StructureDefinition sd = context.fetchResource<StructureDefinition>(t);
-        //        while (sd != null)
-        //        {
-        //            if (tail == null && typesContains(sd.Url))
-        //                return true;
-        //            if (tail == null && getSystemType(sd.Url) != null && typesContains(getSystemType(sd.Url)))
-        //                return true;
-        //            if (tail != null && typesContains(sd.Url + "#" + sd.Type + tail))
-        //                return true;
-        //            if (!string.IsNullOrEmpty(sd.BaseDefinition))
-        //            {
-        //                if (sd.BaseDefinition.Equals("http://hl7.org/fhir/StructureDefinition/Element") && !sd.Type.Equals("string") && sd.Type.Equals("uri"))
-        //                    sd = context.fetchResource<StructureDefinition>("http://hl7.org/fhir/StructureDefinition/string");
-        //                else
-        //                    sd = context.fetchResource<StructureDefinition>(sd.BaseDefinition);
-        //            }
-        //            else
-        //                sd = null;
-        //        }
-        //    }
-        //    return false;
-        //}
+        public bool hasType(IWorkerContext context, params string[] tn)
+        {
+            foreach (String n in tn)
+            {
+                String t = ProfiledType.ns(n);
+                if (typesContains(t))
+                    return true;
+                if (Utilities.existsInList(n, "bool", "string", "integer", "decimal", "Quantity", "dateTime", "time", "ClassInfo", "SimpleTypeInfo"))
+                {
+                    t = FP_NS + Utilities.capitalize(n);
+                    if (typesContains(t))
+                        return true;
+                }
+            }
+            foreach (String n in tn)
+            {
+                String id = n.Contains("#") ? n.Substring(0, n.IndexOf("#")) : n;
+                String tail = null;
+                if (n.Contains("#"))
+                {
+                    tail = n.Substring(n.IndexOf("#") + 1);
+                    tail = tail.Substring(tail.IndexOf("."));
+                }
+                String t = ProfiledType.ns(n);
+                StructureDefinition sd = context.fetchResource<StructureDefinition>(t);
+                while (sd != null)
+                {
+                    if (tail == null && typesContains(sd.Url))
+                        return true;
+                    if (tail == null && getSystemType(sd.Url) != null && typesContains(getSystemType(sd.Url)))
+                        return true;
+                    if (tail != null && typesContains(sd.Url + "#" + sd.Type + tail))
+                        return true;
+                    if (!string.IsNullOrEmpty(sd.BaseDefinition))
+                    {
+                        if (sd.BaseDefinition.Equals("http://hl7.org/fhir/StructureDefinition/Element") && !sd.Type.Equals("string") && sd.Type.Equals("uri"))
+                            sd = context.fetchResource<StructureDefinition>("http://hl7.org/fhir/StructureDefinition/string");
+                        else
+                            sd = context.fetchResource<StructureDefinition>(sd.BaseDefinition);
+                    }
+                    else
+                        sd = null;
+                }
+            }
+            return false;
+        }
 
         private String getSystemType(String url)
         {

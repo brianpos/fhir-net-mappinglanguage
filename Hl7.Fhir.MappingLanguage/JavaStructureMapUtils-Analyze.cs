@@ -242,7 +242,7 @@ namespace Hl7.Fhir.MappingLanguage
             string getOverrideVersionNs();
             ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value);
             StructureDefinition fetchTypeDefinition(string code);
-            ValueSet fetchResourceWithException(string v, string uri);
+            T fetchResourceWithException<T>(string uri) where T : Resource;
         }
 
         private static void produceConceptMap(StringBuilder b, ConceptMap cm)
@@ -1548,7 +1548,7 @@ namespace Hl7.Fhir.MappingLanguage
             // if we can get this as a valueSet, we will
             string system = null;
             string display = null;
-            ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException("ValueSet", uri);
+            ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException<ValueSet>(uri);
             if (vs != null)
             {
                 var vse = worker.expandVS(vs, true, false);
@@ -2457,6 +2457,7 @@ namespace Hl7.Fhir.MappingLanguage
             profile.FhirVersion = EnumUtility.ParseLiteral<FHIRVersion>(ModelInfo.Version);
             profile.Kind = prop.getBaseProperty().getStructure().Kind;
             profile.Abstract = false;
+            profile.Differential = new StructureDefinition.DifferentialComponent();
 
             ElementDefinition ed = new ElementDefinition();
             profile.Differential.Element.Add(ed);
@@ -2489,39 +2490,6 @@ namespace Hl7.Fhir.MappingLanguage
         private string tail(string url)
         {
             return url.Substring(url.LastIndexOf("/") + 1);
-        }
-
-
-        private void addChildMappings(StringBuilder b, string id, string indent, StructureDefinition sd, ElementDefinition ed, bool inner)
-        {
-            bool first = true;
-            List<ElementDefinition> children = ProfileUtilities.getChildMap(sd, ed);
-            foreach (ElementDefinition child in children)
-            {
-                if (first && inner)
-                {
-                    b.Append(" then {\r\n");
-                    first = false;
-                }
-                string map = getMapping(child, id);
-                if (map != null)
-                {
-                    b.Append(indent + "  " + child.Path + ": " + map);
-                    addChildMappings(b, id, indent + "  ", sd, child, true);
-                    b.AppendLine();
-                }
-            }
-            if (!first && inner)
-                b.Append(indent + "}");
-
-        }
-
-        private string getMapping(ElementDefinition ed, string id)
-        {
-            foreach (var map in ed.Mapping)
-                if (id.Equals(map.Identity))
-                    return map.Map;
-            return null;
         }
     }
 }

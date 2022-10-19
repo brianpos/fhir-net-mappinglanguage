@@ -40,6 +40,7 @@ using System.Linq;
 using System.Text;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
+using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 
 namespace Hl7.Fhir.MappingLanguage
 {
@@ -1082,7 +1083,7 @@ namespace Hl7.Fhir.MappingLanguage
                 source.Context = "@search";
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                // source.setUserData(MAP_SEARCH_EXPRESSION, node);
+                source.setUserData(MAP_SEARCH_EXPRESSION, node);
                 source.Element = node.ToString();
                 lexer.token(")");
             }
@@ -1120,21 +1121,21 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                // source.setUserData(MAP_WHERE_EXPRESSION, node);
+                source.setUserData(MAP_WHERE_EXPRESSION, node);
                 source.Condition = node.ToString();
             }
             if (lexer.hasToken("check"))
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                // source.setUserData(MAP_WHERE_CHECK, node);
+                source.setUserData(MAP_WHERE_CHECK, node);
                 source.Check = node.ToString();
             }
             if (lexer.hasToken("log"))
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
-                // source.setUserData(MAP_WHERE_CHECK, node);
+                source.setUserData(MAP_WHERE_CHECK, node);
                 source.LogMessage = node.ToString();
             }
         }
@@ -1170,7 +1171,7 @@ namespace Hl7.Fhir.MappingLanguage
                 // inline fluentpath expression
                 target.Transform = StructureMap.StructureMapTransform.Evaluate;
                 ExpressionNode node = fpe.parse(lexer);
-                // target.setUserData(MAP_EXPRESSION, node);
+                target.setUserData(MAP_EXPRESSION, node);
                 target.addParameter().Value = new FhirString(node.ToString());
                 lexer.token(")");
             }
@@ -1183,7 +1184,7 @@ namespace Hl7.Fhir.MappingLanguage
                     parseParameter(target, lexer);
                     lexer.token(",");
                     ExpressionNode node = fpe.parse(lexer);
-                    // target.setUserData(MAP_EXPRESSION, node);
+                    target.setUserData(MAP_EXPRESSION, node);
                     target.addParameter().Value = new FhirString(node.ToString());
                 }
                 else
