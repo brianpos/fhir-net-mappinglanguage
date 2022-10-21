@@ -29,13 +29,16 @@
 
 // Portions ported from/compatible with https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/model/StructureMap.java
 
+using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml;
+using System.Xml.Linq;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.Model.ElementDefinition;
 
@@ -402,6 +405,59 @@ namespace Hl7.Fhir.MappingLanguage
             if (me.Slicing == null)
                 me.Slicing = new ElementDefinition.SlicingComponent();
             return me.Slicing;
+        }
+
+        public static string[] getTypesForProperty(this Base me, string name)
+        {
+            if (me != null)
+            {
+                var cm = ModelInspector.GetClassMappingForType(me.GetType());
+                if (cm != null)
+                {
+                    var pm = cm.FindMappedElementByName(name);
+                    if (pm != null)
+                    {
+                        return pm.FhirType.Select(ft => ModelInfo.GetFhirTypeNameForType(ft)).ToArray();
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static Base setProperty(this Base me, string name, Base value)
+        {
+            if (me != null)
+            {
+                var cm = ModelInspector.GetClassMappingForType(me.GetType());
+                if (cm != null)
+                {
+                    var pm = cm.FindMappedElementByName(name);
+                    if (pm != null)
+                    {
+                        pm.SetValue(me, value);
+                    }
+                }
+            }
+            return value;
+        }
+
+        public static Base makeProperty(this Base me, string name)
+        {
+            if (me != null)
+            {
+                var cm = ModelInspector.GetClassMappingForType(me.GetType());
+                if (cm != null)
+                {
+                    var pm = cm.FindMappedElementByName(name);
+                    if (pm != null)
+                    {
+                        Base value = Activator.CreateInstance(pm.ImplementingType) as Base;
+                        pm.SetValue(me, value);
+                        return value;
+                    }
+                }
+            }
+            return null;
         }
     }
 }
