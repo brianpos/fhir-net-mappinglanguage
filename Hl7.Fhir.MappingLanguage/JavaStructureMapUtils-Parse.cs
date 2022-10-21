@@ -28,19 +28,18 @@
 */
 
 // Port from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/StructureMapUtilities.java
-
+// (the parse/serialize portions)
 
 // remember group resolution
 // trace - account for which wasn't transformed in the source
 
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
-using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 
 namespace Hl7.Fhir.MappingLanguage
 {
@@ -59,11 +58,6 @@ namespace Hl7.Fhir.MappingLanguage
      */
     public class StructureMapUtilitiesParse
     {
-        public class ResolvedGroup
-        {
-            public StructureMap.GroupComponent target;
-            public StructureMap targetMap;
-        }
         public const string MAP_WHERE_CHECK = "map.where.check";
         public const string MAP_WHERE_LOG = "map.where.log";
         public const string MAP_WHERE_EXPRESSION = "map.where.expression";
@@ -73,8 +67,6 @@ namespace Hl7.Fhir.MappingLanguage
         private const string AUTO_VAR_NAME = "vvv";
 
         private FHIRPathEngine fpe;
-        private Dictionary<string, int> ids = new Dictionary<string, int>();
-
 
         public StructureMapUtilitiesParse()
         {
@@ -244,13 +236,6 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-        public static string groupToString(StructureMap.GroupComponent g)
-        {
-            StringBuilder b = new StringBuilder();
-            renderGroup(b, g);
-            return b.ToString();
-        }
-
         private static void renderGroup(StringBuilder b, StructureMap.GroupComponent g)
         {
             b.Append("group ");
@@ -299,13 +284,6 @@ namespace Hl7.Fhir.MappingLanguage
                 renderRule(b, r, 2);
             }
             b.Append("}\r\n\r\n");
-        }
-
-        public static string ruleToString(StructureMap.RuleComponent r)
-        {
-            StringBuilder b = new StringBuilder();
-            renderRule(b, r, 0);
-            return b.ToString();
         }
 
         private static void renderRule(StringBuilder b, StructureMap.RuleComponent r, int indent)
@@ -1266,152 +1244,6 @@ namespace Hl7.Fhir.MappingLanguage
                 return new FhirDecimal(decVal);
 
             return new FhirString(lexer.processConstant(s));
-        }
-
-        //public StructureDefinition getTargetType(StructureMap map)
-        //{
-        //    bool found = false;
-        //    StructureDefinition res = null;
-        //    foreach (StructureMap.StructureComponent uses in map.Structure)
-        //    {
-        //        if (uses.Mode == StructureMap.StructureMapModelMode.Target)
-        //        {
-        //            if (found)
-        //                throw new FHIRException("Multiple targets found in map " + map.Url);
-        //            found = true;
-        //            res = worker.fetchResource<StructureDefinition>(uses.Url);
-        //            if (res == null)
-        //                throw new FHIRException("Unable to find " + uses.Url + " referenced from map " + map.Url);
-        //        }
-        //    }
-        //    if (res == null)
-        //        throw new FHIRException("No targets found in map " + map.Url);
-        //    return res;
-        //}
-
-        public enum VariableMode
-        {
-            INPUT, OUTPUT, SHARED
-        }
-
-        public class Variable
-        {
-            private VariableMode _mode;
-            private string _name;
-            private Base _object;
-            public Variable(VariableMode mode, string name, Base obj)
-            {
-
-                this._mode = mode;
-                this._name = name;
-                this._object = obj;
-            }
-            public VariableMode Mode
-            {
-                get { return _mode; }
-            }
-            public string Name
-            {
-                get
-                {
-                    return _name;
-                }
-            }
-            public Base getObject()
-            {
-                return _object;
-            }
-            public string summary()
-            {
-                if (_object == null)
-                    return null;
-                else if (_object is PrimitiveType)
-                    return _name + ": \"" + ((PrimitiveType)_object).ToString() + '"';
-                else
-                    return _name + ": (" + _object.TypeName + ")";
-            }
-        }
-
-        public class Variables
-        {
-            private List<Variable> list = new List<Variable>();
-
-            public void add(VariableMode mode, string name, Base obj)
-            {
-                Variable vv = null;
-                foreach (Variable v in list)
-                    if ((v.Mode == mode) && v.Name.Equals(name))
-                        vv = v;
-                if (vv != null)
-                    list.Remove(vv);
-                list.Add(new Variable(mode, name, obj));
-            }
-
-            public Variables copy()
-            {
-                Variables result = new Variables();
-                result.list.AddRange(list);
-                return result;
-            }
-
-            public Base get(VariableMode mode, string name)
-            {
-                foreach (Variable v in list)
-                    if ((v.Mode == mode) && v.Name.Equals(name))
-                        return v.getObject();
-                return null;
-            }
-
-            public string summary()
-            {
-                var s = new List<string>();
-                var t = new List<string>();
-                var sh = new List<string>();
-                foreach (Variable v in list)
-                    switch (v.Mode)
-                    {
-                        case VariableMode.INPUT:
-                            s.Add(v.summary());
-                            break;
-                        case VariableMode.OUTPUT:
-                            t.Add(v.summary());
-                            break;
-                        case VariableMode.SHARED:
-                            sh.Add(v.summary());
-                            break;
-                    }
-                return "source variables [" + string.Join(",", s) + "], target variables [" + string.Join(",", t) + "], shared variables [" + string.Join(",", sh) + "]";
-            }
-
-        }
-
-        public class TransformContext
-        {
-            private Object appInfo;
-
-            public TransformContext(Object appInfo)
-            {
-
-                this.appInfo = appInfo;
-            }
-
-            public Object getAppInfo()
-            {
-                return appInfo;
-            }
-
-        }
-
-        private class SourceElementComponentWrapper
-        {
-            internal ConceptMap.GroupComponent group;
-            internal ConceptMap.SourceElementComponent comp;
-            public SourceElementComponentWrapper(ConceptMap.GroupComponent group, ConceptMap.SourceElementComponent comp)
-            {
-
-                this.group = group;
-                this.comp = comp;
-            }
         }
 
         private string tail(string url)
