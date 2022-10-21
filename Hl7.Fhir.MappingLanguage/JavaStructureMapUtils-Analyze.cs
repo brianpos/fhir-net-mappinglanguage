@@ -1011,22 +1011,6 @@ namespace Hl7.Fhir.MappingLanguage
                     throw new FHIRException("Unable to find definition for " + type.getType());
                 ElementDefinition edn = sdn.Snapshot.getElementFirstRep();
                 PropertyWithType pn = createProfile(map, profiles, new PropertyWithType(sdn.Id, new Property(worker, edn, sdn), null, type), sliceName, tgt);
-
-                //      // 2. hook it into the base bundle
-                //      if (type.Type.StartsWith("http://hl7.org/fhir/StructureDefinition/") && worker.getResourceNames().contains(type.Type.Substring(40))) {
-                //        StructureDefinition sd = var.getProperty().profileProperty.Structure;
-                //        ElementDefinition ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry");
-                //        ed.setName(sliceName);
-                //        ed.setMax("1"); // well, it is for now...
-                //        ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry.fullUrl");
-                //        ed.setMin(1);
-                //        ed = sd.getDifferential().addElement();
-                //        ed.setPath("Bundle.entry.resource");
-                //        ed.setMin(1);
-                //        ed.addType().setCode(pn.getProfileProperty().Structure.Type).setProfile(pn.getProfileProperty().Structure.Url);
-                //      }
                 return pn;
             }
             else
