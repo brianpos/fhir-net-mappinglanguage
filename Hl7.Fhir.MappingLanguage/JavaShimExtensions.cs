@@ -43,7 +43,16 @@ namespace Hl7.Fhir.MappingLanguage
 {
     public class CommaSeparatedStringBuilder
     {
+        public CommaSeparatedStringBuilder()
+        {
+        }
+        public CommaSeparatedStringBuilder(string separator)
+        {
+            _separator = separator;
+        }
+
         private StringBuilder _sb = new StringBuilder();
+        private string _separator = ",";
 
         public override string ToString()
         {
@@ -53,8 +62,21 @@ namespace Hl7.Fhir.MappingLanguage
         internal void append(string value)
         {
             if (_sb.Length > 0)
-                _sb.Append(",");
+                _sb.Append(_separator);
             _sb.Append(value);
+        }
+
+        internal void appendIfNotNull(string value)
+        {
+            if (!string.IsNullOrEmpty(value))
+            {
+                append(value);
+            }
+        }
+
+        internal int Length()
+        {
+            return _sb.Length;
         }
     }
 
