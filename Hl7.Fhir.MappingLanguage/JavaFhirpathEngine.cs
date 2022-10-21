@@ -30,8 +30,10 @@
 // Port (partial) from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/FHIRPathEngine.java
 // The execution engine was not ported (will use the Firely SDK version)
 
-using Hl7.Fhir.MappingLanguage;
+using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
+using Hl7.FhirPath;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -91,6 +93,36 @@ namespace Hl7.Fhir.MappingLanguage
         {
             // TODO: BRIAN recheck the params here, quite the disconnect
             return _engine.check(vars, null, null, expr);
+        }
+
+        internal string evaluateToString(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        {
+            FhirPathCompiler fpc = new FhirPathCompiler();
+            var exprCompiled = fpc.Compile(expr.ToString());
+            var results = exprCompiled.Invoke(data.ToTypedElement(), new FhirEvaluationContext());
+            var fhirValues = results.ToFhirValues();
+            if (!fhirValues.Any())
+                return null;
+            if (fhirValues.FirstOrDefault() is FhirString s)
+                return s.Value;
+            // TODO: BRIAN Should this throw if you don't get what you expect?
+            return null;
+        }
+
+        internal bool evaluateToBoolean(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        {
+            FhirPathCompiler fpc = new FhirPathCompiler();
+            var exprCompiled = fpc.Compile(expr.ToString());
+            var result = exprCompiled.Predicate(data.ToTypedElement(), new FhirEvaluationContext());
+            return result;
+        }
+
+        internal IEnumerable<Base> evaluate(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        {
+            FhirPathCompiler fpc = new FhirPathCompiler();
+            var exprCompiled = fpc.Compile(expr.ToString());
+            var results = exprCompiled.Invoke(data.ToTypedElement(), new FhirEvaluationContext());
+            return results.ToFhirValues();
         }
     }
 
