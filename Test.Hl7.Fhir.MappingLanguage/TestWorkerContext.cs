@@ -4,6 +4,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
 
 namespace Test.FhirMappingLanguage
@@ -60,6 +61,21 @@ namespace Test.FhirMappingLanguage
         {
             return null;
             // throw new NotImplementedException();
+        }
+
+        public StructureMap getTransform(string value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerable<StructureMap> listTransforms()
+        {
+            throw new NotImplementedException();
+        }
+
+        public string oid2Uri(string code)
+        {
+            throw new NotImplementedException();
         }
 
         public ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value)
