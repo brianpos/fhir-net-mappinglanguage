@@ -33,17 +33,16 @@
 // remember group resolution
 // trace - account for which wasn't transformed in the source
 
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Support;
+using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
-using static Hl7.Fhir.Model.StructureMap;
-using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
-using System.ComponentModel.Design;
+using static Hl7.Fhir.Model.StructureMap;
 
 namespace Hl7.Fhir.MappingLanguage
 {
@@ -180,6 +179,7 @@ namespace Hl7.Fhir.MappingLanguage
         private ProfileKnowledgeProvider pkp;
         private Dictionary<string, int> ids = new Dictionary<string, int>();
         private TerminologyServiceOptions terminologyServiceOptions = new TerminologyServiceOptions();
+        private DefaultModelFactory _factory = new DefaultModelFactory();
 
         public StructureMapUtilitiesExecute(IWorkerContext worker, ITransformerServices services, ProfileKnowledgeProvider pkp)
         {
@@ -343,7 +343,7 @@ namespace Hl7.Fhir.MappingLanguage
          */
         protected void getChildrenByName(Base item, string name, List<Base> result)
         {
-            foreach (Base v in item.listChildrenByName(name, true))
+            foreach (Base v in item.NamedChildren.Where(nc => nc.ElementName == name).Select(nc => nc.Value))
                 if (v != null)
                     result.Add(v);
         }
@@ -916,7 +916,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 v = runTransform(ruleId, context, map, group, tgt, vars, dest, tgt.Element, srcVar, atRoot);
                 if (v != null && dest != null)
-                    v = dest.setProperty(tgt.Element.hashCode(), tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
+                    v = dest.setProperty(tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
             }
             else if (dest != null)
             {
@@ -925,13 +925,13 @@ namespace Hl7.Fhir.MappingLanguage
                     v = sharedVars.get(VariableMode.SHARED, tgt.ListRuleId);
                     if (v == null)
                     {
-                        v = dest.makeProperty(tgt.Element.hashCode(), tgt.Element);
+                        v = dest.makeProperty(tgt.Element);
                         sharedVars.add(VariableMode.SHARED, tgt.ListRuleId, v);
                     }
                 }
                 else
                 {
-                    v = dest.makeProperty(tgt.Element.hashCode(), tgt.Element);
+                    v = dest.makeProperty(tgt.Element);
                 }
             }
             if (!string.IsNullOrEmpty(tgt.Variable) && v != null)
@@ -950,7 +950,7 @@ namespace Hl7.Fhir.MappingLanguage
                         if (!tgt.Parameter.Any())
                         {
                             // we have to work out the type. First, we see if there is a single type for the target. If there is, we use that
-                            string[] types = dest.getTypesForProperty(element.hashCode(), element);
+                            string[] types = dest.getTypesForProperty(element);
                             if (types.Count() == 1 && !"*".Equals(types[0]) && !types[0].Equals("Resource"))
                                 tn = types[0];
                             else if (srcVar != null)
@@ -973,8 +973,8 @@ namespace Hl7.Fhir.MappingLanguage
                                 }
                             }
                         }
-                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : ResourceFactory.createResourceOrType(tn);
-                        if (Parser && !res.TypeName.Equals("Parameters"))
+                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : _factory.Create(ModelInfo.GetTypeForFhirType(tn)) as Base;
+                        if (!res.TypeName.Equals("Parameters"))
                         {
                             //	        res.setIdBase(tgt.Parameter.Count() > 1 ? getParamString(vars, tgt.Parameter.First()) : UUID.randomUUID().ToString().toLowerCase());
                             if (services != null)
@@ -1043,11 +1043,12 @@ namespace Hl7.Fhir.MappingLanguage
                             throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.TypeName);
                         else
                         {
-                            string id = b.getIdBase();
+                            string id = (b as Resource)?.Id;
                             if (id == null)
                             {
-                                id = UUID.randomUUID().ToString().toLowerCase();
-                                b.setIdBase(id);
+                                id = Guid.NewGuid().ToFhirId();
+                                if (b is Resource r)
+                                    r.Id = id;
                             }
                             return new ResourceReference(b.TypeName + "/" + id);
                         }
@@ -1055,7 +1056,7 @@ namespace Hl7.Fhir.MappingLanguage
                         throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
 
                     case StructureMap.StructureMapTransform.Uuid:
-                        return new Id(UUID.randomUUID().ToString());
+                        return new Id(Guid.NewGuid().ToFhirId());
 
                     case StructureMap.StructureMapTransform.Pointer:
                         b = getParam(vars, tgt.Parameter.First());
@@ -1187,24 +1188,22 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 src.Code = pt.ToString();
             }
-            else if ("Coding".Equals(source.TypeName))
+            else if (source is Coding coding)
             {
-                Base[] b = source.getProperty("system".hashCode(), "system", true);
-                if (b.Length == 1)
-                    src.System = b[0].primitiveValue();
-                b = source.getProperty("code".hashCode(), "code", true);
-                if (b.Length == 1)
-                    src.setCode(b[0].primitiveValue());
+                src.System = coding.System;
+                src.Code = coding.Code;
+                src.Display = coding.Display;
             }
-            else if ("CE".Equals(source.TypeName))
-            {
-                Base[] b = source.getProperty("codeSystem".hashCode(), "codeSystem", true);
-                if (b.Length == 1)
-                    src.setSystem(b[0].primitiveValue());
-                b = source.getProperty("code".hashCode(), "code", true);
-                if (b.Length == 1)
-                    src.setCode(b[0].primitiveValue());
-            }
+            // TODO: BRIAN what is the typename "CE"
+            //else if ("CE".Equals(source.TypeName))
+            //{
+            //    Base[] b = source.getProperty("codeSystem", true);
+            //    if (b.Length == 1)
+            //        src.System = b[0].primitiveValue();
+            //    b = source.getProperty("code", true);
+            //    if (b.Length == 1)
+            //        src.Code = b[0].primitiveValue();
+            //}
             else
                 throw new FHIRException("Unable to translate source " + source.TypeName);
 
@@ -1287,7 +1286,7 @@ namespace Hl7.Fhir.MappingLanguage
                     {
                         foreach (var tgt in list.First().comp.Target)
                         {
-                            var equivalentTargets = new [] { ConceptMapEquivalence.Equal, ConceptMapEquivalence.Relatedto, ConceptMapEquivalence.Equivalent, ConceptMapEquivalence.Wider };
+                            var equivalentTargets = new[] { ConceptMapEquivalence.Equal, ConceptMapEquivalence.Relatedto, ConceptMapEquivalence.Equivalent, ConceptMapEquivalence.Wider };
                             if (!tgt.Equivalence.HasValue || equivalentTargets.Contains(tgt.Equivalence.Value))
                             {
                                 if (done)
