@@ -314,7 +314,10 @@ namespace Hl7.Fhir.MappingLanguage
                             executeDependency(indent + "  ", context, map, v, group, dependent);
                         }
                     }
-                    else if (rule.Source.Count() == 1 && rule.getSourceFirstRep().Variable != null && rule.Target.Count() == 1 && !string.IsNullOrEmpty(rule.getTargetFirstRep().Variable) && rule.getTargetFirstRep().Transform == StructureMapTransform.Create && rule.getTargetFirstRep().Parameter == null)
+                    else if (rule.Source.Count() == 1 && !string.IsNullOrEmpty(rule.getSourceFirstRep().Variable)
+                          && rule.Target.Count() == 1 && !string.IsNullOrEmpty(rule.getTargetFirstRep().Variable)
+                          && rule.getTargetFirstRep().Transform == StructureMapTransform.Create
+                          && !rule.getTargetFirstRep().Parameter.Any())
                     {
                         // simple inferred, map by type
                         System.Diagnostics.Trace.WriteLine(v.summary());
