@@ -47,6 +47,17 @@ namespace Test.FhirMappingLanguage
             // https://fhir.dk.swisstph-mis.ch/matchbox/fhir/StructureMap/emcarea.registration.p
             var expression = System.IO.File.ReadAllText("C:\\Users\\brian\\Downloads\\structuremap-emcarea.registration.p.map");
             var qr = new QuestionnaireResponse();
+            qr.Subject = new ResourceReference("Patient/1", "Brian");
+            qr.Encounter = new ResourceReference("Encounter/1", "Social Services");
+            qr.Item.Add(new QuestionnaireResponse.ItemComponent()
+            {
+                LinkId = "emcarerelatedpersoncaregiverid"
+            });
+            qr.Item[0].Answer.Add(new QuestionnaireResponse.AnswerComponent()
+            {
+                Value = new FhirString("relper1")
+            });
+
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(expression, null);
             var engine = new StructureMapUtilitiesExecute(null);
@@ -58,9 +69,9 @@ namespace Test.FhirMappingLanguage
             catch(System.Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
-                var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(bundle);
-                System.Diagnostics.Trace.WriteLine(xml2);
             }
+            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(bundle);
+            System.Diagnostics.Trace.WriteLine(xml2);
         }
 
         [TestMethod]

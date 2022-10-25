@@ -88,9 +88,9 @@ namespace Hl7.Fhir.MappingLanguage
             public List<Base> resolveConstant(Object appContext, string name, bool beforeContext)
             {
                 Variables vars = (Variables)appContext;
-                Base res = vars.get(VariableMode.INPUT, name);
+                Base res = vars.getInputVar(name);
                 if (res == null)
-                    res = vars.get(VariableMode.OUTPUT, name);
+                    res = vars.getOutputVar(name);
                 List<Base> result = new List<Base>();
                 if (res != null)
                     result.Add(res);
@@ -287,6 +287,16 @@ namespace Hl7.Fhir.MappingLanguage
                 return result;
             }
 
+            public Base getInputVar(string name)
+            {
+                return get(VariableMode.INPUT, name);
+            }
+
+            public Base getOutputVar(string name)
+            {
+                return get(VariableMode.OUTPUT, name);
+            }
+
             public Base get(VariableMode mode, string name)
             {
                 foreach (Variable v in list)
@@ -415,9 +425,9 @@ namespace Hl7.Fhir.MappingLanguage
                 return parameter.Value;
 
             string n = p.Value;
-            Base b = vars.get(VariableMode.INPUT, n);
+            Base b = vars.getInputVar(n);
             if (b == null)
-                b = vars.get(VariableMode.OUTPUT, n);
+                b = vars.getOutputVar(n);
             if (b == null)
                 throw new DefinitionException("Variable " + n + " not found (" + vars.summary() + ")");
             return b;

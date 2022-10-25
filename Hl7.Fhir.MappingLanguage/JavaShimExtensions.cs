@@ -29,10 +29,12 @@
 
 // Portions ported from/compatible with https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/model/StructureMap.java
 
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -424,6 +426,7 @@ namespace Hl7.Fhir.MappingLanguage
             return null;
         }
 
+        // New version will map from ITypedElement to SourceNode
         public static Base setProperty(this Base me, string name, Base value)
         {
             if (me != null)
@@ -434,7 +437,27 @@ namespace Hl7.Fhir.MappingLanguage
                     var pm = cm.FindMappedElementByName(name);
                     if (pm != null)
                     {
-                        pm.SetValue(me, value);
+                        try
+                        {
+                            if (pm.ImplementingType == typeof(string) && value is FhirString str)
+                            {
+                                pm.SetValue(me, str.Value);
+                                return value;
+                            }
+                            pm.SetValue(me, value);
+                            return value;
+                        }
+                        catch (Exception ex)
+                        {
+                            Base value2 = Activator.CreateInstance(pm.ImplementingType) as Base;
+                            if (value2 is PrimitiveType pt && value is PrimitiveType ps)
+                            {
+                                pt.ObjectValue = ps.ObjectValue;
+                                pm.SetValue(me, value2);
+                                return value2;
+                            }
+                            System.Diagnostics.Trace.WriteLine($"Recovered from {ex.Message}");
+                        }
                     }
                 }
             }
@@ -452,7 +475,15 @@ namespace Hl7.Fhir.MappingLanguage
                     if (pm != null)
                     {
                         Base value = Activator.CreateInstance(pm.ImplementingType) as Base;
-                        pm.SetValue(me, value);
+                        if (pm.IsCollection)
+                        {
+                            var list = pm.GetValue(me) as IList;
+                            list.Add(value);
+                        }
+                        else
+                        {
+                            pm.SetValue(me, value);
+                        }
                         return value;
                     }
                 }

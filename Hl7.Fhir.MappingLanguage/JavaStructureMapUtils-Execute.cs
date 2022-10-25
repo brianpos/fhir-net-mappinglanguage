@@ -33,8 +33,11 @@
 // remember group resolution
 // trace - account for which wasn't transformed in the source
 
+using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Specification;
 using Hl7.Fhir.Support;
 using Hl7.Fhir.Utility;
 using System;
@@ -411,14 +414,14 @@ namespace Hl7.Fhir.MappingLanguage
                     {
                         processTarget(rule.Name, context, v, map, group, t, rule.Source.Count() == 1 ? rule.getSourceFirstRep().Variable : null, atRoot, vars);
                     }
-                    if (rule.Rule != null)
+                    if (rule.Rule.Any())
                     {
                         foreach (StructureMap.RuleComponent childrule in rule.Rule)
                         {
                             executeRule(indent + "  ", context, map, v, group, childrule, false);
                         }
                     }
-                    else if (rule.Dependent != null)
+                    else if (rule.Dependent.Any())
                     {
                         foreach (var dependent in rule.Dependent)
                         {
@@ -429,8 +432,8 @@ namespace Hl7.Fhir.MappingLanguage
                     {
                         // simple inferred, map by type
                         System.Diagnostics.Trace.WriteLine(v.summary());
-                        Base src = v.get(VariableMode.INPUT, rule.getSourceFirstRep().Variable);
-                        Base tgt = v.get(VariableMode.OUTPUT, rule.getTargetFirstRep().Variable);
+                        Base src = v.getInputVar(rule.getSourceFirstRep().Variable);
+                        Base tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
                         string srcType = src.TypeName;
                         string tgtType = tgt.TypeName;
                         ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
@@ -460,7 +463,7 @@ namespace Hl7.Fhir.MappingLanguage
                 VariableMode mode = input.Mode == StructureMap.StructureMapInputMode.Source ? VariableMode.INPUT : VariableMode.OUTPUT;
                 Base vv = vin.get(mode, varVal);
                 if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenient
-                    vv = vin.get(VariableMode.OUTPUT, varVal);
+                    vv = vin.getOutputVar(varVal);
                 if (vv == null)
                     throw new FHIRException("Rule '" + dependent.Name + "' " + mode.ToString() + " variable '" + input.Name + "' named as '" + varVal + "' has no value (vars = " + vin.summary() + ")");
                 v.add(mode, input.Name, vv);
@@ -770,7 +773,7 @@ namespace Hl7.Fhir.MappingLanguage
             else
             {
                 items = new List<Base>();
-                Base b = vars.get(VariableMode.INPUT, src.Context);
+                Base b = vars.getInputVar(src.Context);
                 if (b == null)
                     throw new FHIRException("Unknown input variable " + src.Context + " in " + pathForErrors + " rule " + ruleId + " (vars = " + vars.summary() + ")");
 
@@ -905,7 +908,8 @@ namespace Hl7.Fhir.MappingLanguage
             Base dest = null;
             if (!string.IsNullOrEmpty(tgt.Context))
             {
-                dest = vars.get(VariableMode.OUTPUT, tgt.Context);
+                dest = vars.getOutputVar(tgt.Context);
+                var destTE = dest.ToTypedElement();
                 if (dest == null)
                     throw new FHIRException("Rule \"" + ruleId + "\": target context not known: " + tgt.Context);
                 if (string.IsNullOrEmpty(tgt.Element))
@@ -947,6 +951,7 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     case StructureMap.StructureMapTransform.Create:
                         string tn;
+                        string rawTypeName;
                         if (!tgt.Parameter.Any())
                         {
                             // we have to work out the type. First, we see if there is a single type for the target. If there is, we use that
@@ -955,7 +960,7 @@ namespace Hl7.Fhir.MappingLanguage
                                 tn = types[0];
                             else if (srcVar != null)
                             {
-                                tn = determineTypeFromSourceType(map, group, vars.get(VariableMode.INPUT, srcVar), types);
+                                tn = determineTypeFromSourceType(map, group, vars.getInputVar(srcVar), types);
                             }
                             else
                                 throw new Exception("Cannot determine type implicitly because there is no single input variable");
@@ -973,7 +978,15 @@ namespace Hl7.Fhir.MappingLanguage
                                 }
                             }
                         }
-                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : _factory.Create(ModelInfo.GetTypeForFhirType(tn)) as Base;
+                        rawTypeName = tn;
+                        if (services == null)
+                        {
+                            if (tn.StartsWith(ModelInfo.FhirCoreProfileBaseUri.OriginalString))
+                            {
+                                rawTypeName = tn.Substring(ModelInfo.FhirCoreProfileBaseUri.OriginalString.Length);
+                            }
+                        }
+                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : _factory.Create(ModelInfo.GetTypeForFhirType(rawTypeName)) as Base;
                         if (!res.TypeName.Equals("Parameters"))
                         {
                             //	        res.setIdBase(tgt.Parameter.Count() > 1 ? getParamString(vars, tgt.Parameter.First()) : UUID.randomUUID().ToString().toLowerCase());
@@ -1151,9 +1164,9 @@ namespace Hl7.Fhir.MappingLanguage
                 return parameter.Value;
 
             string n = p.Value;
-            Base b = vars.get(VariableMode.INPUT, n);
+            Base b = vars.getInputVar(n);
             if (b == null)
-                b = vars.get(VariableMode.OUTPUT, n);
+                b = vars.getOutputVar(n);
             if (b == null)
                 throw new DefinitionException("Variable " + n + " not found (" + vars.summary() + ")");
             return b;
