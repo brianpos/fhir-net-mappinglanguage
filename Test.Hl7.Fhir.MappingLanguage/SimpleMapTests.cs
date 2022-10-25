@@ -1,7 +1,10 @@
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
+using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Test.FhirMappingLanguage
@@ -60,17 +63,22 @@ namespace Test.FhirMappingLanguage
 
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(expression, null);
-            var engine = new StructureMapUtilitiesExecute(null);
-            var bundle = new Bundle();
+
+            var worker = TutorialTests.CreateWorker();
+            var provider = new PocoStructureDefinitionSummaryProvider();
+            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+            var output = new Bundle();
+            var target = ElementNode.FromElement(output.ToTypedElement());
             try
             {
-                engine.transform(null, qr, sm, bundle);
+                engine.transform(null, qr.ToTypedElement(), sm, target);
+                target.ToPoco().CopyTo(output);
             }
-            catch(System.Exception ex)
+            catch (System.Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
             }
-            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(bundle);
+            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
             System.Diagnostics.Trace.WriteLine(xml2);
         }
 

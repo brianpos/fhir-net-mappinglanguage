@@ -179,12 +179,12 @@ namespace Hl7.Fhir.MappingLanguage
         private IWorkerContext worker;
         private FHIRPathEngine fpe;
         private ITransformerServices services;
-        private ProfileKnowledgeProvider pkp;
+        private IStructureDefinitionSummaryProvider pkp;
         private Dictionary<string, int> ids = new Dictionary<string, int>();
         private TerminologyServiceOptions terminologyServiceOptions = new TerminologyServiceOptions();
         private DefaultModelFactory _factory = new DefaultModelFactory();
 
-        public StructureMapUtilitiesExecute(IWorkerContext worker, ITransformerServices services, ProfileKnowledgeProvider pkp)
+        public StructureMapUtilitiesExecute(IWorkerContext worker, ITransformerServices services, IStructureDefinitionSummaryProvider pkp)
         {
             this.worker = worker;
             this.services = services;
@@ -208,120 +208,6 @@ namespace Hl7.Fhir.MappingLanguage
             fpe.setHostServices(new FFHIRPathHostServices());
         }
 
-
-        //public enum VariableMode
-        //{
-        //    INPUT, OUTPUT, SHARED
-        //}
-
-        //public class Variable
-        //{
-        //    private VariableMode _mode;
-        //    private string _name;
-        //    private Base _object;
-        //    public Variable(VariableMode mode, string name, Base obj)
-        //    {
-
-        //        this._mode = mode;
-        //        this._name = name;
-        //        this._object = obj;
-        //    }
-        //    public VariableMode Mode
-        //    {
-        //        get { return _mode; }
-        //    }
-        //    public string Name
-        //    {
-        //        get
-        //        {
-        //            return _name;
-        //        }
-        //    }
-        //    public Base getObject()
-        //    {
-        //        return _object;
-        //    }
-        //    public string summary()
-        //    {
-        //        if (_object == null)
-        //            return null;
-        //        else if (_object is PrimitiveType)
-        //            return _name + ": \"" + ((PrimitiveType)_object).ToString() + '"';
-        //        else
-        //            return _name + ": (" + _object.TypeName + ")";
-        //    }
-        //}
-
-        //public class Variables
-        //{
-        //    private List<Variable> list = new List<Variable>();
-
-        //    public void add(VariableMode mode, string name, Base obj)
-        //    {
-        //        Variable vv = null;
-        //        foreach (Variable v in list)
-        //            if ((v.Mode == mode) && v.Name.Equals(name))
-        //                vv = v;
-        //        if (vv != null)
-        //            list.Remove(vv);
-        //        list.Add(new Variable(mode, name, obj));
-        //    }
-
-        //    public Variables copy()
-        //    {
-        //        Variables result = new Variables();
-        //        result.list.AddRange(list);
-        //        return result;
-        //    }
-
-        //    public Base get(VariableMode mode, string name)
-        //    {
-        //        foreach (Variable v in list)
-        //            if ((v.Mode == mode) && v.Name.Equals(name))
-        //                return v.getObject();
-        //        return null;
-        //    }
-
-        //    public string summary()
-        //    {
-        //        var s = new List<string>();
-        //        var t = new List<string>();
-        //        var sh = new List<string>();
-        //        foreach (Variable v in list)
-        //            switch (v.Mode)
-        //            {
-        //                case VariableMode.INPUT:
-        //                    s.Add(v.summary());
-        //                    break;
-        //                case VariableMode.OUTPUT:
-        //                    t.Add(v.summary());
-        //                    break;
-        //                case VariableMode.SHARED:
-        //                    sh.Add(v.summary());
-        //                    break;
-        //            }
-        //        return "source variables [" + string.Join(",", s) + "], target variables [" + string.Join(",", t) + "], shared variables [" + string.Join(",", sh) + "]";
-        //    }
-
-        //}
-
-        //public class TransformContext
-        //{
-        //    private Object appInfo;
-
-        //    public TransformContext(Object appInfo)
-        //    {
-
-        //        this.appInfo = appInfo;
-        //    }
-
-        //    public Object getAppInfo()
-        //    {
-        //        return appInfo;
-        //    }
-
-        //}
-
         private void log(string cnt)
         {
             if (services != null)
@@ -344,15 +230,15 @@ namespace Hl7.Fhir.MappingLanguage
          * @param result
          * @throws FHIRException
          */
-        protected void getChildrenByName(Base item, string name, List<Base> result)
+        protected void getChildrenByName(ITypedElement item, string name, List<ITypedElement> result)
         {
-            foreach (Base v in item.NamedChildren.Where(nc => nc.ElementName == name).Select(nc => nc.Value))
+            foreach (ITypedElement v in item.Children(name))
                 if (v != null)
                     result.Add(v);
         }
 
 
-        public void transform(Object appInfo, Base source, StructureMap map, Base target)
+        public void transform(Object appInfo, ITypedElement source, StructureMap map, ElementNode target)
         {
             TransformContext context = new TransformContext(appInfo);
             log("Start Transform " + map.Url);
@@ -432,10 +318,10 @@ namespace Hl7.Fhir.MappingLanguage
                     {
                         // simple inferred, map by type
                         System.Diagnostics.Trace.WriteLine(v.summary());
-                        Base src = v.getInputVar(rule.getSourceFirstRep().Variable);
-                        Base tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
-                        string srcType = src.TypeName;
-                        string tgtType = tgt.TypeName;
+                        ITypedElement src = v.getInputVar(rule.getSourceFirstRep().Variable);
+                        ElementNode tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
+                        string srcType = src.InstanceType;
+                        string tgtType = tgt.InstanceType;
                         ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
                         Variables vdef = new Variables();
                         vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
@@ -461,7 +347,7 @@ namespace Hl7.Fhir.MappingLanguage
                 var rdp = dependent.VariableElement[i];
                 string varVal = rdp.Value;
                 VariableMode mode = input.Mode == StructureMap.StructureMapInputMode.Source ? VariableMode.INPUT : VariableMode.OUTPUT;
-                Base vv = vin.get(mode, varVal);
+                ITypedElement vv = vin.get(mode, varVal);
                 if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenient
                     vv = vin.getOutputVar(varVal);
                 if (vv == null)
@@ -471,9 +357,9 @@ namespace Hl7.Fhir.MappingLanguage
             executeGroup(indent + "  ", context, rg.targetMap, v, rg.target, false);
         }
 
-        private string determineTypeFromSourceType(StructureMap map, StructureMap.GroupComponent source, Base baseV, string[] types)
+        private string determineTypeFromSourceType(StructureMap map, StructureMap.GroupComponent source, ITypedElement baseV, string[] types)
         {
-            string type = baseV.TypeName;
+            string type = baseV.InstanceType;
             string kn = "type^" + type;
             if (source.hasUserData(kn))
                 return source.getUserData(kn) as string;
@@ -758,7 +644,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private List<Variables> processSource(string ruleId, TransformContext context, Variables vars, StructureMap.SourceComponent src, string pathForErrors, string indent)
         {
-            List<Base> items;
+            List<ITypedElement> items;
             if (src.Context.Equals("@search"))
             {
                 ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_SEARCH_EXPRESSION);
@@ -767,13 +653,13 @@ namespace Hl7.Fhir.MappingLanguage
                     expr = fpe.parse(src.Element);
                     src.setUserData(MAP_SEARCH_EXPRESSION, expr);
                 }
-                string search = fpe.evaluateToString(vars, null, null, new FhirString(), expr); // string is a holder of nothing to ensure that variables are processed correctly
+                string search = fpe.evaluateToString(vars, null, null, ElementNode.ForPrimitive(""), expr); // string is a holder of nothing to ensure that variables are processed correctly
                 items = services.performSearch(context.getAppInfo(), search);
             }
             else
             {
-                items = new List<Base>();
-                Base b = vars.getInputVar(src.Context);
+                items = new List<ITypedElement>();
+                ITypedElement b = vars.getInputVar(src.Context);
                 if (b == null)
                     throw new FHIRException("Unknown input variable " + src.Context + " in " + pathForErrors + " rule " + ruleId + " (vars = " + vars.summary() + ")");
 
@@ -783,14 +669,14 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     getChildrenByName(b, src.Element, items);
                     if (items.Count() == 0 && src.DefaultValue != null)
-                        items.Add(src.DefaultValue);
+                        items.Add(src.DefaultValue.ToTypedElement());
                 }
             }
 
             if (!string.IsNullOrEmpty(src.Type))
             {
-                List<Base> remove = new List<Base>();
-                foreach (Base item in items)
+                List<ITypedElement> remove = new List<ITypedElement>();
+                foreach (ITypedElement item in items)
                 {
                     if (item != null && !isType(item, src.Type))
                     {
@@ -809,8 +695,8 @@ namespace Hl7.Fhir.MappingLanguage
                     //        fpe.check(context.appInfo, ??, ??, expr)
                     src.setUserData(MAP_WHERE_EXPRESSION, expr);
                 }
-                List<Base> remove = new List<Base>();
-                foreach (Base item in items)
+                List<ITypedElement> remove = new List<ITypedElement>();
+                foreach (ITypedElement item in items)
                 {
                     if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
                     {
@@ -832,8 +718,8 @@ namespace Hl7.Fhir.MappingLanguage
                     //        fpe.check(context.appInfo, ??, ??, expr)
                     src.setUserData(MAP_WHERE_CHECK, expr);
                 }
-                List<Base> remove = new List<Base>();
-                foreach (Base item in items)
+                List<ITypedElement> remove = new List<ITypedElement>();
+                foreach (ITypedElement item in items)
                 {
                     if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
                         throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed");
@@ -850,7 +736,7 @@ namespace Hl7.Fhir.MappingLanguage
                     src.setUserData(MAP_WHERE_LOG, expr);
                 }
                 CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-                foreach (Base item in items)
+                foreach (ITypedElement item in items)
                     b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
                 if (b.Length() > 0)
                     services.log(b.ToString());
@@ -861,7 +747,7 @@ namespace Hl7.Fhir.MappingLanguage
                 switch (src.ListMode)
                 {
                     case StructureMapSourceListMode.First:
-                        Base bt = items.First();
+                        ITypedElement bt = items.First();
                         items.Clear();
                         items.Add(bt);
                         break;
@@ -885,7 +771,7 @@ namespace Hl7.Fhir.MappingLanguage
                 }
             }
             List<Variables> result = new List<Variables>();
-            foreach (Base r in items)
+            foreach (ITypedElement r in items)
             {
                 Variables v = vars.copy();
                 if (!string.IsNullOrEmpty(src.Variable))
@@ -896,31 +782,30 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        private bool isType(Base item, string type)
+        private bool isType(ITypedElement item, string type)
         {
-            if (type.Equals(item.TypeName))
+            if (type.Equals(item.InstanceType))
                 return true;
             return false;
         }
 
         private void processTarget(string ruleId, TransformContext context, Variables vars, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, string srcVar, bool atRoot, Variables sharedVars)
         {
-            Base dest = null;
+            ITypedElement dest = null;
             if (!string.IsNullOrEmpty(tgt.Context))
             {
                 dest = vars.getOutputVar(tgt.Context);
-                var destTE = dest.ToTypedElement();
                 if (dest == null)
                     throw new FHIRException("Rule \"" + ruleId + "\": target context not known: " + tgt.Context);
                 if (string.IsNullOrEmpty(tgt.Element))
                     throw new FHIRException("Rule \"" + ruleId + "\": Not supported yet");
             }
-            Base v = null;
+            ITypedElement v = null;
             if (tgt.Transform.HasValue)
             {
                 v = runTransform(ruleId, context, map, group, tgt, vars, dest, tgt.Element, srcVar, atRoot);
                 if (v != null && dest != null)
-                    v = dest.setProperty(tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
+                    v = dest.setProperty(pkp, tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
             }
             else if (dest != null)
             {
@@ -929,13 +814,13 @@ namespace Hl7.Fhir.MappingLanguage
                     v = sharedVars.get(VariableMode.SHARED, tgt.ListRuleId);
                     if (v == null)
                     {
-                        v = dest.makeProperty(tgt.Element);
+                        v = dest.makeProperty(pkp, tgt.Element);
                         sharedVars.add(VariableMode.SHARED, tgt.ListRuleId, v);
                     }
                 }
                 else
                 {
-                    v = dest.makeProperty(tgt.Element);
+                    v = dest.makeProperty(pkp, tgt.Element);
                 }
             }
             if (!string.IsNullOrEmpty(tgt.Variable) && v != null)
@@ -943,7 +828,7 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        private Base runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, Base dest, string element, string srcVar, bool root)
+        private ITypedElement runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, ITypedElement dest, string element, string srcVar, bool root)
         {
             try
             {
@@ -955,7 +840,7 @@ namespace Hl7.Fhir.MappingLanguage
                         if (!tgt.Parameter.Any())
                         {
                             // we have to work out the type. First, we see if there is a single type for the target. If there is, we use that
-                            string[] types = dest.getTypesForProperty(element);
+                            string[] types = dest.getTypesForProperty(pkp, element);
                             if (types.Count() == 1 && !"*".Equals(types[0]) && !types[0].Equals("Resource"))
                                 tn = types[0];
                             else if (srcVar != null)
@@ -986,8 +871,8 @@ namespace Hl7.Fhir.MappingLanguage
                                 rawTypeName = tn.Substring(ModelInfo.FhirCoreProfileBaseUri.OriginalString.Length);
                             }
                         }
-                        Base res = services != null ? services.createType(context.getAppInfo(), tn) : _factory.Create(ModelInfo.GetTypeForFhirType(rawTypeName)) as Base;
-                        if (!res.TypeName.Equals("Parameters"))
+                        ITypedElement res = services != null ? services.createType(context.getAppInfo(), tn) : ElementNode.Root(pkp, rawTypeName) as ITypedElement;
+                        if (!res.InstanceType.Equals("Parameters"))
                         {
                             //	        res.setIdBase(tgt.Parameter.Count() > 1 ? getParamString(vars, tgt.Parameter.First()) : UUID.randomUUID().ToString().toLowerCase());
                             if (services != null)
@@ -1007,7 +892,7 @@ namespace Hl7.Fhir.MappingLanguage
                             expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
                             tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
                         }
-                        IEnumerable<Base> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : new FhirBoolean(false), expr);
+                        IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);
                         if (v.Count() == 0)
                             return null;
                         else if (v.Count() != 1)
@@ -1024,7 +909,7 @@ namespace Hl7.Fhir.MappingLanguage
                             if (src.Length > l)
                                 src = src.Substring(0, l);
                         }
-                        return new FhirString(src);
+                        return ElementNode.ForPrimitive(src);
 
                     case StructureMap.StructureMapTransform.Escape:
                         throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
@@ -1035,7 +920,7 @@ namespace Hl7.Fhir.MappingLanguage
                             throw new FHIRException("Implicit type parameters on cast not yet supported");
                         string t = getParamString(vars, tgt.Parameter[1]);
                         if (t.Equals("string"))
-                            return new FhirString(src);
+                            return ElementNode.ForPrimitive(src);
                         else
                             throw new FHIRException("cast to " + t + " not yet supported");
 
@@ -1043,17 +928,17 @@ namespace Hl7.Fhir.MappingLanguage
                         StringBuilder sb = new StringBuilder(getParamString(vars, tgt.Parameter.First()));
                         for (int i = 1; i < tgt.Parameter.Count(); i++)
                             sb.Append(getParamString(vars, tgt.Parameter[i]));
-                        return new FhirString(sb.ToString());
+                        return ElementNode.ForPrimitive(sb.ToString());
 
                     case StructureMap.StructureMapTransform.Translate:
                         return translate(context, map, vars, tgt.Parameter);
 
                     case StructureMap.StructureMapTransform.Reference:
-                        Base b = getParam(vars, tgt.Parameter.First());
+                        ITypedElement b = getParam(vars, tgt.Parameter.First());
                         if (b == null)
                             throw new FHIRException("Rule \"" + ruleId + "\": Unable to find parameter " + ((Id)tgt.Parameter.First().Value).ToString());
                         if (!(b is Resource))
-                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.TypeName);
+                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.InstanceType);
                         else
                         {
                             string id = (b as Resource)?.Id;
@@ -1063,29 +948,29 @@ namespace Hl7.Fhir.MappingLanguage
                                 if (b is Resource r)
                                     r.Id = id;
                             }
-                            return new ResourceReference(b.TypeName + "/" + id);
+                            return new ResourceReference(b.InstanceType + "/" + id).ToTypedElement();
                         }
                     case StructureMap.StructureMapTransform.DateOp:
                         throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
 
                     case StructureMap.StructureMapTransform.Uuid:
-                        return new Id(Guid.NewGuid().ToFhirId());
+                        return new Id(Guid.NewGuid().ToFhirId()).ToTypedElement();
 
                     case StructureMap.StructureMapTransform.Pointer:
                         b = getParam(vars, tgt.Parameter.First());
                         if (b is Resource)
-                            return new FhirUri("urn:uuid:" + ((Resource)b).Id);
+                            return new FhirUri("urn:uuid:" + ((Resource)b).Id).ToTypedElement();
 
                         else
-                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.TypeName);
+                            throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.InstanceType);
                     case StructureMap.StructureMapTransform.Cc:
                         CodeableConcept cc = new CodeableConcept();
                         cc.Coding.Add(buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString())));
-                        return cc;
+                        return cc.ToTypedElement();
 
                     case StructureMap.StructureMapTransform.C:
                         Coding c = buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
-                        return c;
+                        return c.ToTypedElement();
 
                     default:
                         throw new Exception("Rule \"" + ruleId + "\": Transform Unknown: " + tgt.Transform.GetLiteral());
@@ -1141,30 +1026,30 @@ namespace Hl7.Fhir.MappingLanguage
 
         private string getParamStringNoNull(Variables vars, StructureMap.ParameterComponent parameter, string message)
         {
-            Base b = getParam(vars, parameter);
+            ITypedElement b = getParam(vars, parameter);
             if (b == null)
                 throw new FHIRException("Unable to find a value for " + parameter.Value.ToString() + ". Context: " + message);
-            if (b is PrimitiveType pt)
-                return pt.ToString();
-            throw new FHIRException("Found a value for " + parameter.ToString() + ", but it has a type of " + b.TypeName + " and cannot be treated as a string. Context: " + message);
+            if (ModelInfo.IsPrimitive(b.InstanceType))
+                return b.Value?.ToString();
+            throw new FHIRException("Found a value for " + parameter.ToString() + ", but it has a type of " + b.InstanceType + " and cannot be treated as a string. Context: " + message);
         }
 
         private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
         {
-            Base b = getParam(vars, parameter);
-            if (b is PrimitiveType pt)
-                return pt.ToString();
+            ITypedElement b = getParam(vars, parameter);
+            if (ModelInfo.IsPrimitive(b.InstanceType))
+                return b.Value?.ToString();
             return null;
         }
 
-        private Base getParam(Variables vars, StructureMap.ParameterComponent parameter)
+        private ITypedElement getParam(Variables vars, StructureMap.ParameterComponent parameter)
         {
             var p = parameter.Value as Id;
             if (p == null)
-                return parameter.Value;
+                return parameter.Value.ToTypedElement();
 
             string n = p.Value;
-            Base b = vars.getInputVar(n);
+            ITypedElement b = vars.getInputVar(n);
             if (b == null)
                 b = vars.getOutputVar(n);
             if (b == null)
@@ -1173,9 +1058,9 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        private Base translate(TransformContext context, StructureMap map, Variables vars, List<StructureMap.ParameterComponent> parameter)
+        private ITypedElement translate(TransformContext context, StructureMap map, Variables vars, List<StructureMap.ParameterComponent> parameter)
         {
-            Base src = getParam(vars, parameter.First());
+            ITypedElement src = getParam(vars, parameter.First());
             string id = getParamString(vars, parameter[1]);
             string fld = parameter.Count() > 2 ? getParamString(vars, parameter[2]) : null;
             return translate(context, map, src, id, fld);
@@ -1194,12 +1079,12 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-        public Base translate(TransformContext context, StructureMap map, Base source, string conceptMapUrl, string fieldToReturn)
+        public ITypedElement translate(TransformContext context, StructureMap map, ITypedElement source, string conceptMapUrl, string fieldToReturn)
         {
             Coding src = new Coding();
-            if (source is PrimitiveType pt)
+            if (ModelInfo.IsPrimitive(source.InstanceType))
             {
-                src.Code = pt.ToString();
+                src.Code = source.Value.ToString();
             }
             else if (source is Coding coding)
             {
@@ -1218,7 +1103,7 @@ namespace Hl7.Fhir.MappingLanguage
             //        src.Code = b[0].primitiveValue();
             //}
             else
-                throw new FHIRException("Unable to translate source " + source.TypeName);
+                throw new FHIRException("Unable to translate source " + source.InstanceType);
 
             string su = conceptMapUrl;
             if (conceptMapUrl.Equals("http://hl7.org/fhir/ConceptMap/special-oid2uri"))
@@ -1227,7 +1112,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (uri == null)
                     uri = "urn:oid:" + src.Code;
                 if ("uri".Equals(fieldToReturn))
-                    return new FhirUri(uri);
+                    return new FhirUri(uri).ToTypedElement();
                 else
                     throw new FHIRException("Error in return code");
             }
@@ -1327,9 +1212,9 @@ namespace Hl7.Fhir.MappingLanguage
                 if (outcome == null)
                     return null;
                 if ("code".Equals(fieldToReturn))
-                    return new Code(outcome.Code);
+                    return new Code(outcome.Code).ToTypedElement();
                 else
-                    return outcome;
+                    return outcome.ToTypedElement();
             }
         }
 

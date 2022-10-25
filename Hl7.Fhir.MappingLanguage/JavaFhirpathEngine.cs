@@ -95,34 +95,35 @@ namespace Hl7.Fhir.MappingLanguage
             return _engine.check(vars, null, null, expr);
         }
 
-        internal string evaluateToString(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        internal string evaluateToString(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
             FhirPathCompiler fpc = new FhirPathCompiler();
             var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled.Invoke(data.ToTypedElement(), new FhirEvaluationContext());
-            var fhirValues = results.ToFhirValues();
-            if (!fhirValues.Any())
+            var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
+            if (!results.Any())
                 return null;
-            if (fhirValues.FirstOrDefault() is FhirString s)
-                return s.Value;
+            if (results.First().InstanceType == "string")
+                return results.First().Value.ToString();
+            if (ModelInfo.IsPrimitive(results.First().InstanceType))
+                return results.First().Value.ToString();
             // TODO: BRIAN Should this throw if you don't get what you expect?
             return null;
         }
 
-        internal bool evaluateToBoolean(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        internal bool evaluateToBoolean(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
             FhirPathCompiler fpc = new FhirPathCompiler();
             var exprCompiled = fpc.Compile(expr.ToString());
-            var result = exprCompiled.Predicate(data.ToTypedElement(), new FhirEvaluationContext());
+            var result = exprCompiled.Predicate(data, new FhirEvaluationContext());
             return result;
         }
 
-        internal IEnumerable<Base> evaluate(Variables vars, object value1, object value2, Base data, ExpressionNode expr)
+        internal IEnumerable<ITypedElement> evaluate(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
             FhirPathCompiler fpc = new FhirPathCompiler();
             var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled.Invoke(data.ToTypedElement(), new FhirEvaluationContext());
-            return results.ToFhirValues();
+            var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
+            return results;
         }
     }
 
@@ -192,7 +193,7 @@ namespace Hl7.Fhir.MappingLanguage
              * @param beforeContext - whether this is being called before the name is resolved locally, or not
              * @return the value of the reference (or null, if it's not valid, though can throw an exception if desired)
              */
-            public List<Base> resolveConstant(Object appContext, String name, bool beforeContext);
+            public List<ITypedElement> resolveConstant(Object appContext, String name, bool beforeContext);
             public TypeDetails resolveConstantType(Object appContext, String name);
 
             /**

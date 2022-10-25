@@ -33,6 +33,7 @@
 // remember group resolution
 // trace - account for which wasn't transformed in the source
 
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 using System;
@@ -70,8 +71,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             //    public bool validateByValueSet(Coding code, string valuesetId);
             public void log(string message); // log internal progress
-            public Base createType(Object appInfo, string name);
-            public Base createResource(Object appInfo, Base res, bool atRootofTransform); // an already created resource is provided; this is to identify/store it
+            public ITypedElement createType(Object appInfo, string name);
+            public ITypedElement createResource(Object appInfo, ITypedElement res, bool atRootofTransform); // an already created resource is provided; this is to identify/store it
             public Coding translate(Object appInfo, Coding source, string conceptMapUrl);
             //    public Coding translate(Coding code)
             //    ValueSet validation operation
@@ -79,19 +80,19 @@ namespace Hl7.Fhir.MappingLanguage
             //    Lookup another tree of data
             //    Create an instance tree
             //    Return the correct string format to refer to a tree (input or output)
-            public Base resolveReference(Object appContext, string url);
-            public List<Base> performSearch(Object appContext, string url);
+            public ITypedElement resolveReference(Object appContext, string url);
+            public List<ITypedElement> performSearch(Object appContext, string url);
         }
 
         internal class FFHIRPathHostServices : IEvaluationContext
         {
-            public List<Base> resolveConstant(Object appContext, string name, bool beforeContext)
+            public List<ITypedElement> resolveConstant(Object appContext, string name, bool beforeContext)
             {
                 Variables vars = (Variables)appContext;
-                Base res = vars.getInputVar(name);
+                ITypedElement res = vars.getInputVar(name);
                 if (res == null)
                     res = vars.getOutputVar(name);
-                List<Base> result = new List<Base>();
+                List<ITypedElement> result = new List<ITypedElement>();
                 if (res != null)
                     result.Add(res);
                 return result;
@@ -231,8 +232,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             private VariableMode _mode;
             private string _name;
-            private Base _object;
-            public Variable(VariableMode mode, string name, Base obj)
+            private ITypedElement _object;
+            public Variable(VariableMode mode, string name, ITypedElement obj)
             {
 
                 this._mode = mode;
@@ -250,7 +251,7 @@ namespace Hl7.Fhir.MappingLanguage
                     return _name;
                 }
             }
-            public Base getObject()
+            public ITypedElement getObject()
             {
                 return _object;
             }
@@ -258,10 +259,9 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 if (_object == null)
                     return null;
-                else if (_object is PrimitiveType)
-                    return _name + ": \"" + ((PrimitiveType)_object).ToString() + '"';
-                else
-                    return _name + ": (" + _object.TypeName + ")";
+                if (ModelInfo.IsPrimitive(_object.InstanceType))
+                    return _name + ": \"" + _object.Value.ToString() + '"';
+                return _name + ": (" + _object.InstanceType + ")";
             }
         }
 
@@ -269,7 +269,7 @@ namespace Hl7.Fhir.MappingLanguage
         {
             private List<Variable> list = new List<Variable>();
 
-            public void add(VariableMode mode, string name, Base obj)
+            public void add(VariableMode mode, string name, ITypedElement obj)
             {
                 Variable vv = null;
                 foreach (Variable v in list)
@@ -287,17 +287,17 @@ namespace Hl7.Fhir.MappingLanguage
                 return result;
             }
 
-            public Base getInputVar(string name)
+            public ITypedElement getInputVar(string name)
             {
                 return get(VariableMode.INPUT, name);
             }
 
-            public Base getOutputVar(string name)
+            public ElementNode getOutputVar(string name)
             {
-                return get(VariableMode.OUTPUT, name);
+                return get(VariableMode.OUTPUT, name) as ElementNode;
             }
 
-            public Base get(VariableMode mode, string name)
+            public ITypedElement get(VariableMode mode, string name)
             {
                 foreach (Variable v in list)
                     if ((v.Mode == mode) && v.Name.Equals(name))
@@ -412,20 +412,20 @@ namespace Hl7.Fhir.MappingLanguage
 
         private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
         {
-            Base b = getParam(vars, parameter);
+            ITypedElement b = getParam(vars, parameter);
             if (b is PrimitiveType pt)
                 return pt.ToString();
             return null;
         }
 
-        private Base getParam(Variables vars, StructureMap.ParameterComponent parameter)
+        private ITypedElement getParam(Variables vars, StructureMap.ParameterComponent parameter)
         {
             var p = parameter.Value as Id;
             if (p == null)
-                return parameter.Value;
+                return parameter.Value.ToTypedElement();
 
             string n = p.Value;
-            Base b = vars.getInputVar(n);
+            ITypedElement b = vars.getInputVar(n);
             if (b == null)
                 b = vars.getOutputVar(n);
             if (b == null)

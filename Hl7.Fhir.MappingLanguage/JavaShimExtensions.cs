@@ -32,7 +32,9 @@
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Specification;
 using Hl7.Fhir.Utility;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -163,7 +165,7 @@ namespace Hl7.Fhir.MappingLanguage
             throw new NotImplementedException();
         }
 
-        public List<Base> resolveConstant(object appContext, string name, bool beforeContext)
+        public List<ITypedElement> resolveConstant(object appContext, string name, bool beforeContext)
         {
             throw new NotImplementedException();
         }
@@ -258,6 +260,16 @@ namespace Hl7.Fhir.MappingLanguage
                 data.data[key] = value;
                 return;
             }
+            if (me is IAnnotatable a)
+            {
+                var ud = new MapperUserData();
+                ud.data[key] = value;
+                a.SetAnnotation(ud);
+            }
+        }
+
+        public static void setUserData(this ITypedElement me, string key, object value)
+        {
             if (me is IAnnotatable a)
             {
                 var ud = new MapperUserData();
@@ -409,17 +421,17 @@ namespace Hl7.Fhir.MappingLanguage
             return me.Slicing;
         }
 
-        public static string[] getTypesForProperty(this Base me, string name)
+        public static string[] getTypesForProperty(this ITypedElement me, IStructureDefinitionSummaryProvider pkp, string name)
         {
             if (me != null)
             {
-                var cm = ModelInspector.GetClassMappingForType(me.GetType());
-                if (cm != null)
+                var ti = pkp.Provide(me.InstanceType);
+                if (ti != null)
                 {
-                    var pm = cm.FindMappedElementByName(name);
-                    if (pm != null)
+                    var eds = ti.GetElements().Where(e => e.ElementName == name);
+                    if (eds != null)
                     {
-                        return pm.FhirType.Select(ft => ModelInfo.GetFhirTypeNameForType(ft)).ToArray();
+                        return eds.SelectMany(e => e.Type.Select(t => t.GetTypeName())).ToArray();
                     }
                 }
             }
@@ -427,66 +439,84 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
         // New version will map from ITypedElement to SourceNode
-        public static Base setProperty(this Base me, string name, Base value)
+        //public static Base setProperty(this Base me, string name, Base value)
+        //{
+        //    if (me != null)
+        //    {
+        //        var cm = ModelInspector.GetClassMappingForType(me.GetType());
+        //        if (cm != null)
+        //        {
+        //            var pm = cm.FindMappedElementByName(name);
+        //            if (pm != null)
+        //            {
+        //                try
+        //                {
+        //                    if (pm.ImplementingType == typeof(string) && value is FhirString str)
+        //                    {
+        //                        pm.SetValue(me, str.Value);
+        //                        return value;
+        //                    }
+        //                    pm.SetValue(me, value);
+        //                    return value;
+        //                }
+        //                catch (Exception ex)
+        //                {
+        //                    Base value2 = Activator.CreateInstance(pm.ImplementingType) as Base;
+        //                    if (value2 is PrimitiveType pt && value is PrimitiveType ps)
+        //                    {
+        //                        pt.ObjectValue = ps.ObjectValue;
+        //                        pm.SetValue(me, value2);
+        //                        return value2;
+        //                    }
+        //                    System.Diagnostics.Trace.WriteLine($"Recovered from {ex.Message}");
+        //                }
+        //            }
+        //        }
+        //    }
+        //    return value;
+        //}
+
+        //public static Base makeProperty(this Base me, string name)
+        //{
+        //    if (me != null)
+        //    {
+        //        var cm = ModelInspector.GetClassMappingForType(me.GetType());
+        //        if (cm != null)
+        //        {
+        //            var pm = cm.FindMappedElementByName(name);
+        //            if (pm != null)
+        //            {
+        //                Base value = Activator.CreateInstance(pm.ImplementingType) as Base;
+        //                if (pm.IsCollection)
+        //                {
+        //                    var list = pm.GetValue(me) as IList;
+        //                    list.Add(value);
+        //                }
+        //                else
+        //                {
+        //                    pm.SetValue(me, value);
+        //                }
+        //                return value;
+        //            }
+        //        }
+        //    }
+        //    return null;
+        //}
+
+        public static ITypedElement setProperty(this ITypedElement me, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
         {
-            if (me != null)
+            if (me is ElementNode en)
             {
-                var cm = ModelInspector.GetClassMappingForType(me.GetType());
-                if (cm != null)
-                {
-                    var pm = cm.FindMappedElementByName(name);
-                    if (pm != null)
-                    {
-                        try
-                        {
-                            if (pm.ImplementingType == typeof(string) && value is FhirString str)
-                            {
-                                pm.SetValue(me, str.Value);
-                                return value;
-                            }
-                            pm.SetValue(me, value);
-                            return value;
-                        }
-                        catch (Exception ex)
-                        {
-                            Base value2 = Activator.CreateInstance(pm.ImplementingType) as Base;
-                            if (value2 is PrimitiveType pt && value is PrimitiveType ps)
-                            {
-                                pt.ObjectValue = ps.ObjectValue;
-                                pm.SetValue(me, value2);
-                                return value2;
-                            }
-                            System.Diagnostics.Trace.WriteLine($"Recovered from {ex.Message}");
-                        }
-                    }
-                }
+                return en.Add(pkp, name, value.Value, value.InstanceType);
             }
-            return value;
+            return null;
         }
 
-        public static Base makeProperty(this Base me, string name)
+        public static ITypedElement makeProperty(this ITypedElement me, IStructureDefinitionSummaryProvider pkp, string name)
         {
-            if (me != null)
+            if (me is ElementNode en)
             {
-                var cm = ModelInspector.GetClassMappingForType(me.GetType());
-                if (cm != null)
-                {
-                    var pm = cm.FindMappedElementByName(name);
-                    if (pm != null)
-                    {
-                        Base value = Activator.CreateInstance(pm.ImplementingType) as Base;
-                        if (pm.IsCollection)
-                        {
-                            var list = pm.GetValue(me) as IList;
-                            list.Add(value);
-                        }
-                        else
-                        {
-                            pm.SetValue(me, value);
-                        }
-                        return value;
-                    }
-                }
+                return en.Add(pkp, name);
             }
             return null;
         }
