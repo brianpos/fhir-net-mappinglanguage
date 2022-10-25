@@ -27,10 +27,12 @@
 
 */
 
-// Port of https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/FHIRLexer.java
+// Port of https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r5/src/main/java/org/hl7/fhir/r5/utils/FHIRLexer.java
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace Hl7.Fhir.MappingLanguage
@@ -89,6 +91,7 @@ namespace Hl7.Fhir.MappingLanguage
         private int cursor;
         private int currentStart;
         private string current;
+        private List<string> comments = new List<string>();
         private SourceLocation currentLocation;
         private SourceLocation currentStartLocation;
         private int id;
@@ -179,7 +182,9 @@ namespace Hl7.Fhir.MappingLanguage
 
         public FHIRLexerException error(string msg, string location)
         {
-            return new FHIRLexerException("Error in " + name + " at " + location + ": " + msg);
+            if (!string.IsNullOrEmpty(name))
+                return new FHIRLexerException("Error in " + name + " at " + location + ": " + msg);
+            return new FHIRLexerException("Error @" + location + ": " + msg);
         }
 
         public void next()
@@ -248,7 +253,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (cursor < source.Length && (source[cursor] == '/'))
                     {
                         // this is en error - should already have been skipped
-                        error("This shoudn't happen?");
+                        error("This shouldn't happen?");
                     }
                     current = source.Substring(currentStart, cursor - currentStart);
                 }
@@ -357,17 +362,23 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void skipWhitespaceAndComments()
         {
+            comments.Clear();
             bool last13 = false;
             bool done = false;
             while (cursor < source.Length && !done)
             {
                 if (cursor < source.Length - 1 && "//".Equals(source.Substring(cursor, 2)))
                 {
+                    int start = cursor + 2;
                     while (cursor < source.Length && !((source[cursor] == '\r') || source[cursor] == '\n'))
+                    {
                         cursor++;
+                    }
+                    comments.Add(source.Substring(start, cursor - start).Trim());
                 }
                 else if (cursor < source.Length - 1 && "/*".Equals(source.Substring(cursor, 2)))
                 {
+                    int start = cursor + 2;
                     while (cursor < source.Length - 1 && !"*/".Equals(source.Substring(cursor, 2)))
                     {
                         last13 = currentLocation.checkChar(source[cursor], last13);
@@ -379,6 +390,7 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     else
                     {
+                        comments.Add(source.Substring(start, cursor - start).Trim());
                         cursor = cursor + 2;
                     }
                 }
@@ -393,7 +405,6 @@ namespace Hl7.Fhir.MappingLanguage
                 }
             }
         }
-
 
         private bool isDateChar(char ch, int start)
         {
@@ -429,10 +440,36 @@ namespace Hl7.Fhir.MappingLanguage
             this.current = current;
         }
 
-        public bool hasComment()
+        public bool hasComments()
         {
-            return !done() && current.StartsWith("//");
+            return comments.Count > 0;
         }
+
+        public List<string> getComments()
+        {
+            return comments;
+        }
+
+        public String getAllComments()
+        {
+            CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder("\r\n");
+            foreach (var c in comments)
+                b.append(c);
+            comments.Clear();
+            return b.ToString();
+        }
+
+        public String getFirstComment()
+        {
+            if (hasComments())
+            {
+                String s = comments.First();
+                comments.RemoveAt(0);
+                return s;
+            }
+            return null;
+        }
+
         public bool hasToken(string kw)
         {
             return !done() && kw.Equals(current);
@@ -601,14 +638,14 @@ namespace Hl7.Fhir.MappingLanguage
             return b.ToString();
         }
 
-        public void skipComments()
-        {
-            while (!done() && hasComment())
-                next();
-        }
         public int getCurrentStart()
         {
             return currentStart;
+        }
+
+        public String getSource()
+        {
+            return source;
         }
 
         public enum Operation

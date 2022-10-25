@@ -81,7 +81,11 @@ namespace Hl7.Fhir.MappingLanguage
             b.Append("\" = \"");
             b.Append(Utilities.escapeJson(map.Name));
             b.Append("\"\r\n\r\n");
-
+            if (!string.IsNullOrEmpty(map.Description?.Value))
+            {
+                renderMultilineDoco(b, map.Description.Value, 0);
+                b.Append("\r\n");
+            }
             renderConceptMaps(b, map);
             renderUses(b, map);
             renderImports(b, map);
@@ -217,8 +221,8 @@ namespace Hl7.Fhir.MappingLanguage
                 }
                 b.Append("as ");
                 b.Append(s.Mode.GetLiteral());
-                b.AppendLine();
                 renderDoco(b, s.Documentation);
+                b.AppendLine();
             }
             if (map.Structure.Any())
                 b.AppendLine();
@@ -238,6 +242,10 @@ namespace Hl7.Fhir.MappingLanguage
 
         private static void renderGroup(StringBuilder b, StructureMap.GroupComponent g)
         {
+            if (!string.IsNullOrEmpty(g.Documentation))
+            {
+                renderMultilineDoco(b, g.Documentation, 0);
+            }
             b.Append("group ");
             b.Append(g.Name);
             b.Append("(");
@@ -288,6 +296,10 @@ namespace Hl7.Fhir.MappingLanguage
 
         private static void renderRule(StringBuilder b, StructureMap.RuleComponent r, int indent)
         {
+            if (!string.IsNullOrEmpty(r.Documentation))
+            {
+                renderMultilineDoco(b, r.Documentation, indent);
+            }
             for (int i = 0; i < indent; i++)
                 b.Append(' ');
             bool canBeAbbreviated = checkisSimple(r);
@@ -330,7 +342,6 @@ namespace Hl7.Fhir.MappingLanguage
             if (r.Rule.Any())
             {
                 b.Append(" then {\r\n");
-                renderDoco(b, r.Documentation);
                 foreach (StructureMap.RuleComponent ir in r.Rule)
                 {
                     renderRule(b, ir, indent + 2);
@@ -378,7 +389,6 @@ namespace Hl7.Fhir.MappingLanguage
                 }
             }
             b.Append(";");
-            renderDoco(b, r.Documentation);
             b.AppendLine();
         }
 
@@ -500,8 +510,6 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (!string.IsNullOrEmpty(rt.Context))
             {
-                if (rt.ContextType == StructureMap.StructureMapContextType.Type)
-                    b.Append("@");
                 b.Append(rt.Context);
                 if (!string.IsNullOrEmpty(rt.Element))
                 {
@@ -599,8 +607,26 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (string.IsNullOrEmpty(doco))
                 return;
-            b.Append(" // ");
+            if (b != null && b.Length > 1 && b[b.Length - 1] != '\n' && b[b.Length - 1] != ' ')
+            {
+                b.Append(" ");
+            }
+            b.Append("// ");
             b.Append(doco.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " "));
+        }
+
+        private static void renderMultilineDoco(StringBuilder b, String doco, int indent)
+        {
+            if (Utilities.noString(doco))
+                return;
+            String[] lines = doco.Replace("\r\n", "\n").Split(new[] { '\r', '\n' });
+            foreach (String line in lines)
+            {
+                for (int i = 0; i < indent; i++)
+                    b.Append(' ');
+                renderDoco(b, line);
+                b.Append("\r\n");
+            }
         }
 
         public StructureMap parse(string text, string srcName)
@@ -608,14 +634,13 @@ namespace Hl7.Fhir.MappingLanguage
             FHIRLexer lexer = new FHIRLexer(text, srcName);
             if (lexer.done())
                 throw lexer.error("Map Input cannot be empty");
-            lexer.skipComments();
             lexer.token("map");
             StructureMap result = new StructureMap();
             result.Url = lexer.readConstant("url");
-            result.Id = tail(result.Url);
+            // result.Id = tail(result.Url); (not in java util code in R4b)
             lexer.token("=");
             result.Name = lexer.readConstant("name");
-            lexer.skipComments();
+            result.Description = new Markdown(lexer.getAllComments());
 
             while (lexer.hasToken("conceptmap"))
                 parseConceptMap(result, lexer);
@@ -657,7 +682,7 @@ namespace Hl7.Fhir.MappingLanguage
             map.Status = PublicationStatus.Draft; // todo: how to add this to the text format
             result.Contained.Add(map);
             lexer.token("{");
-            lexer.skipComments();
+
             //	  lexer.token("source");
             //	  map.setSource(new UriType(lexer.readConstant("source")));
             //	  lexer.token("target");
@@ -710,8 +735,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (tgt.Code.StartsWith("\""))
                         tgt.Code = lexer.processConstant(tgt.Code);
                 }
-                if (lexer.hasComment())
-                    tgt.Comment = lexer.take().Substring(2).Trim();
+                tgt.Comment = lexer.getFirstComment();
             }
             lexer.token("}");
         }
@@ -785,11 +809,7 @@ namespace Hl7.Fhir.MappingLanguage
             lexer.token("as");
             st.Mode = EnumUtility.ParseLiteral<StructureMap.StructureMapModelMode>(lexer.take());
             lexer.skipToken(";");
-            if (lexer.hasComment())
-            {
-                st.Documentation = lexer.take().Substring(2).Trim();
-            }
-            lexer.skipComments();
+            st.Documentation = lexer.getFirstComment();
         }
 
         private void parseImports(StructureMap result, FHIRLexer lexer)
@@ -797,17 +817,16 @@ namespace Hl7.Fhir.MappingLanguage
             lexer.token("imports");
             result.ImportElement.Add(new Canonical(lexer.readConstant("url")));
             lexer.skipToken(";");
-            if (lexer.hasComment())
-            {
-                lexer.next();
-            }
-            lexer.skipComments();
+            lexer.getFirstComment();
         }
 
         private void parseGroup(StructureMap result, FHIRLexer lexer)
         {
+            String comment = lexer.getAllComments();
             lexer.token("group");
             StructureMap.GroupComponent group = new StructureMap.GroupComponent();
+            if (!string.IsNullOrEmpty(comment))
+                group.Documentation = comment;
             result.Group.Add(group);
             bool newFmt = false;
             if (lexer.hasToken("for"))
@@ -869,7 +888,6 @@ namespace Hl7.Fhir.MappingLanguage
                 }
                 lexer.token("{");
             }
-            lexer.skipComments();
             if (newFmt)
             {
                 while (!lexer.hasToken("}"))
@@ -893,7 +911,6 @@ namespace Hl7.Fhir.MappingLanguage
             lexer.next();
             if (newFmt && lexer.hasToken(";"))
                 lexer.next();
-            lexer.skipComments();
         }
 
         private void parseInput(StructureMap.GroupComponent group, FHIRLexer lexer, bool newFmt)
@@ -916,12 +933,8 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.token("as");
                 input.Mode = EnumUtility.ParseLiteral<StructureMap.StructureMapInputMode>(lexer.take());
-                if (lexer.hasComment())
-                {
-                    input.Documentation = lexer.take().Substring(2).Trim();
-                }
+                input.Documentation = lexer.getAllComments(); ;
                 lexer.skipToken(";");
-                lexer.skipComments();
             }
         }
 
@@ -934,6 +947,10 @@ namespace Hl7.Fhir.MappingLanguage
                 rule.Name = lexer.takeDottedToken();
                 lexer.token(":");
                 lexer.token("for");
+            }
+            else
+            {
+                rule.Documentation = lexer.getFirstComment();
             }
             bool done = false;
             while (!done)
@@ -961,11 +978,6 @@ namespace Hl7.Fhir.MappingLanguage
                 if (lexer.hasToken("{"))
                 {
                     lexer.token("{");
-                    if (lexer.hasComment())
-                    {
-                        rule.Documentation = lexer.take().Substring(2).Trim();
-                    }
-                    lexer.skipComments();
                     while (!lexer.hasToken("}"))
                     {
                         if (lexer.done())
@@ -986,9 +998,9 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                 }
             }
-            else if (lexer.hasComment())
+            else if (string.IsNullOrEmpty(rule.Documentation) && lexer.hasComments())
             {
-                rule.Documentation = lexer.take().Substring(2).Trim();
+                rule.Documentation = lexer.getFirstComment();
             }
             if (isSimpleSyntax(rule))
             {
@@ -1021,7 +1033,6 @@ namespace Hl7.Fhir.MappingLanguage
                 }
                 lexer.token(";");
             }
-            lexer.skipComments();
         }
 
         private bool isSimpleSyntax(StructureMap.RuleComponent rule)
