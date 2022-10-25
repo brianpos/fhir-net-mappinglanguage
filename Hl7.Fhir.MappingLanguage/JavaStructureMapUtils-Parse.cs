@@ -1043,7 +1043,7 @@ namespace Hl7.Fhir.MappingLanguage
             var targetFirstRep = rule.getTargetFirstRep();
             return
                 (rule.Source.Count() == 1 && sourceFirstRep.Context != null && sourceFirstRep.Element != null && sourceFirstRep.Variable == null) &&
-                (rule.Target.Count() == 1 && targetFirstRep.Context != null && targetFirstRep.Element != null && targetFirstRep.Variable == null && targetFirstRep.Parameter == null) &&
+                (rule.Target.Count() == 1 && targetFirstRep.Context != null && targetFirstRep.Element != null && targetFirstRep.Variable == null && !targetFirstRep.Parameter.Any()) &&
                 (rule.Dependent.Count() == 0 && rule.Rule.Count() == 0);
         }
 
