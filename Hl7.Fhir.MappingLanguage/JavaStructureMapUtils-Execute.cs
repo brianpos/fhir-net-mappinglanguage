@@ -892,7 +892,18 @@ namespace Hl7.Fhir.MappingLanguage
                         ExpressionNode expr = (ExpressionNode)tgt.getUserData(MAP_EXPRESSION);
                         if (expr == null)
                         {
-                            expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
+                            // This is a bug in the JAVA code too!
+                            // Log it with Grahame to be fixed
+                            if (tgt.Parameter.Count == 1)
+                            {
+                                // This is the "short circuit" format of the fhirpath expression
+                                var expression = getParamStringNoNull(vars, tgt.Parameter[0], tgt.ToString());
+                                expr = fpe.parse(expression);
+                                if (!expr.getName().StartsWith("%"))
+                                    expr.setName("%" + expr.getName());
+                            }
+                            else if (tgt.Parameter.Count == 2)
+                                expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
                             tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
                         }
                         IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);

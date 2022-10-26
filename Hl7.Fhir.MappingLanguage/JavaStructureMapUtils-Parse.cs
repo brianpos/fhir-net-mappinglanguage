@@ -528,15 +528,19 @@ namespace Hl7.Fhir.MappingLanguage
                 else if (rt.Transform == StructureMap.StructureMapTransform.Evaluate && rt.Parameter.Count() == 1)
                 {
                     b.Append("(");
-                    b.Append("\"" + ((StringType)rt.Parameter.First().Value).asStringValue() + "\"");
+                    // TODO: BRIAN chasing up if this requires quotes or not
+                    // b.Append("'" + ((FhirString)rt.Parameter.First().Value).ToString() + "'");
+                    b.Append(((PrimitiveType)rt.Parameter.First().Value).ToString());
                     b.Append(")");
                 }
                 else if (rt.Transform == StructureMap.StructureMapTransform.Evaluate && rt.Parameter.Count() == 2)
                 {
                     b.Append(rt.Transform.GetLiteral());
                     b.Append("(");
-                    b.Append(((IdType)rt.Parameter.First().Value).asStringValue());
-                    b.Append("\"" + ((StringType)rt.Parameter[1].Value).asStringValue() + "\"");
+                    b.Append(((PrimitiveType)rt.Parameter.First().Value).ToString());
+                    // TODO: BRIAN chasing up if this requires quotes or not
+                    // b.Append("'" + ((FhirString)rt.Parameter[1].Value).ToString() + "'");
+                    b.Append(((PrimitiveType)rt.Parameter[1].Value).ToString());
                     b.Append(")");
                 }
                 else
