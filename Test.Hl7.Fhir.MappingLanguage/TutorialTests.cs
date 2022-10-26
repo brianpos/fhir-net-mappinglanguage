@@ -440,8 +440,6 @@ namespace Test.FhirMappingLanguage
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
-
-
             var target = ElementNode.Root(provider, "TRight");
             try
             {
