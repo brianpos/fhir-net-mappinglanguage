@@ -269,6 +269,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             private List<Variable> list = new List<Variable>();
 
+            public IEnumerable<Variable> All() { return list; }
+
             public void add(VariableMode mode, string name, ITypedElement obj)
             {
                 Variable vv = null;

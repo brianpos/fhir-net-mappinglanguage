@@ -34,6 +34,7 @@ using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
+using Hl7.FhirPath.Expressions;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -97,7 +98,12 @@ namespace Hl7.Fhir.MappingLanguage
 
         internal string evaluateToString(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            FhirPathCompiler fpc = new FhirPathCompiler();
+            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
+            foreach (var variable in vars.All())
+            {
+                st.AddVar(variable.Name, variable.getObject());
+            }
+            FhirPathCompiler fpc = new FhirPathCompiler(st);
             var exprCompiled = fpc.Compile(expr.ToString());
             var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
             if (!results.Any())
@@ -112,7 +118,12 @@ namespace Hl7.Fhir.MappingLanguage
 
         internal bool evaluateToBoolean(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            FhirPathCompiler fpc = new FhirPathCompiler();
+            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
+            foreach (var variable in vars.All())
+            {
+                st.AddVar(variable.Name, variable.getObject());
+            }
+            FhirPathCompiler fpc = new FhirPathCompiler(st);
             var exprCompiled = fpc.Compile(expr.ToString());
             var result = exprCompiled.Predicate(data, new FhirEvaluationContext());
             return result;
@@ -120,7 +131,12 @@ namespace Hl7.Fhir.MappingLanguage
 
         internal IEnumerable<ITypedElement> evaluate(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            FhirPathCompiler fpc = new FhirPathCompiler();
+            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
+            foreach (var variable in vars.All())
+            {
+                st.AddVar(variable.Name, variable.getObject());
+            }
+            FhirPathCompiler fpc = new FhirPathCompiler(st);
             var exprCompiled = fpc.Compile(expr.ToString());
             var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
             return results;

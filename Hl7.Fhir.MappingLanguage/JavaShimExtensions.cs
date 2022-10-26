@@ -291,6 +291,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me.TryGetAnnotation<MapperUserData>(out MapperUserData data))
             {
+                if (!data.data.ContainsKey(key))
+                    return false;
                 return data.data[key] != null;
             }
             return false;
