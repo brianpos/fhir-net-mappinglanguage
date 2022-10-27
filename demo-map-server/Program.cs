@@ -16,9 +16,25 @@ namespace demo_map_server
             // initialize the fhirpath FHIR extensions
             FhirPathCompiler.DefaultSymbolTable.AddFhirExtensions();
 
-            DirectorySystemService<System.IServiceProvider>.Directory = @"c:\temp\demo-map-server";
+            var appFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            appFolder = Path.Combine(appFolder, "demo-map-server", "data");
+            DirectorySystemService<System.IServiceProvider>.Directory = appFolder;
+            // DirectorySystemService<System.IServiceProvider>.Directory = @"c:\temp\demo-map-server";
             if (!System.IO.Directory.Exists(DirectorySystemService<System.IServiceProvider>.Directory))
                 System.IO.Directory.CreateDirectory(DirectorySystemService<System.IServiceProvider>.Directory);
+
+
+            // CORS Support
+            builder.Services.AddCors(o => o.AddDefaultPolicy(builder =>
+            {
+                // Better to use with Origins to only permit locations that we really trust
+                builder.AllowAnyOrigin();
+                // builder.WithOrigins(settings.AllowedOrigins);
+                builder.AllowAnyHeader();
+                builder.AllowAnyMethod();
+                // builder.AllowCredentials();
+                builder.WithExposedHeaders(new[] { "Content-Location", "Location", "ETag" });
+            }));
 
             builder.Services.AddSingleton<IFhirSystemServiceR4<IServiceProvider>>((s) =>
             {
@@ -38,8 +54,9 @@ namespace demo_map_server
                 // StructureMap transform input/output formatter
                 options.Filters.Add(new StructureMapTransform.StructureMapTransformFilter());
             });
-            var app = builder.Build();
 
+            var app = builder.Build();
+            app.UseCors();
             app.UseRouting();
             app.UseEndpoints(endpoints =>
             {

@@ -98,7 +98,7 @@ namespace demo_map_server
                             Details = new CodeableConcept(null, null, $"Missing the source paremeter")
                         });
                     }
-                    else if (content.Entry.Count() > 1)
+                    else
                     {
                         // Use the current version functionality to select the latest of them
                         var current = CurrentCanonical.Current(content.Entry.Select(e => e.Resource as IVersionableConformanceResource));
