@@ -1169,9 +1169,12 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 // inline fluentpath expression
                 target.Transform = StructureMap.StructureMapTransform.Evaluate;
+                // consider if this *should* prefix the expression at this stage with the %
                 ExpressionNode node = fpe.parse(lexer);
-                target.setUserData(MAP_EXPRESSION, node);
                 target.addParameter().Value = new FhirString(node.ToString());
+                if (!node.getName().StartsWith("%"))
+                    node.setName("%"+node.getName());
+                target.setUserData(MAP_EXPRESSION, node);
                 lexer.token(")");
             }
             else if (lexer.hasToken("("))
