@@ -1028,14 +1028,18 @@ namespace Hl7.Fhir.MappingLanguage
                 }
                 else
                 {
-                    if (rule.Source.Count() != 1 || rule.getSourceFirstRep().Element == null)
-                        throw lexer.error("Complex rules must have an explicit name");
+                    //if (rule.Source.Count() != 1 || rule.getSourceFirstRep().Element == null)
+                    //    throw lexer.error("Complex rules must have an explicit name");
                     if (rule.getSourceFirstRep().Type != null)
                         rule.Name = rule.getSourceFirstRep().Element + "-" + rule.getSourceFirstRep().Type;
                     else
                         rule.Name = rule.getSourceFirstRep().Element;
                 }
                 lexer.token(";");
+
+                // only required for R4, R5 has removed this constraint
+                if (string.IsNullOrEmpty(rule.Name) && ModelInfo.Version.StartsWith("4"))
+                    rule.Name = Guid.NewGuid().ToFhirId();
             }
         }
 
