@@ -639,13 +639,52 @@ namespace Hl7.Fhir.MappingLanguage
             FHIRLexer lexer = new FHIRLexer(text, srcName);
             if (lexer.done())
                 throw lexer.error("Map Input cannot be empty");
+            string comments = lexer.getAllComments();
             lexer.token("map");
             StructureMap result = new StructureMap();
             result.Url = lexer.readConstant("url");
             // result.Id = tail(result.Url); (not in java util code in R4b)
             lexer.token("=");
             result.Name = lexer.readConstant("name");
-            result.Description = new Markdown(lexer.getAllComments());
+            if (!string.IsNullOrEmpty(comments))
+            {
+                // TODO: Parse these comments for code comments
+                CommaSeparatedStringBuilder csb = new CommaSeparatedStringBuilder();
+                foreach (var line in comments.Split('\n'))
+                {
+                    int index = line.IndexOf("=");
+                    if (line.StartsWith("/ ") && index > 2)
+                    {
+                        // this is likely a metadata set item
+                        string prop = line.Substring(2, index - 3).Trim();
+                        string value = line.Substring(index + 1).Trim();
+                        switch (prop.ToLower())
+                        {
+                            case "status":
+                                result.Status = EnumUtility.ParseLiteral<PublicationStatus>(value);
+                                break;
+
+                            case "title":
+                                result.Title = value;
+                                break;
+
+                            case "name":
+                                // skip this one as it should be read from the name constant prop in the grammar
+                                csb.append(line.TrimEnd());
+                                break;
+                            default:
+                                csb.append(line.TrimEnd());
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        csb.append(line.TrimEnd());
+                    }
+                }
+                if (!string.IsNullOrEmpty(csb.ToString()))
+                    result.Description = new Markdown(csb.ToString());
+            }
 
             while (lexer.hasToken("conceptmap"))
                 parseConceptMap(result, lexer);
