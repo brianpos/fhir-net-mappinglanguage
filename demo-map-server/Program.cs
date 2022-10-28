@@ -38,7 +38,7 @@ namespace demo_map_server
 
             builder.Services.AddSingleton<IFhirSystemServiceR4<IServiceProvider>>((s) =>
             {
-                var result = new MapServerSystemService();
+                var result = new Services.MapServerSystemService();
                 result.InitializeIndexes();
                 return result;
             });

@@ -34,7 +34,6 @@
 // trace - account for which wasn't transformed in the source
 
 using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
@@ -955,18 +954,17 @@ namespace Hl7.Fhir.MappingLanguage
                         ITypedElement b = getParam(vars, tgt.Parameter.First());
                         if (b == null)
                             throw new FHIRException("Rule \"" + ruleId + "\": Unable to find parameter " + ((Id)tgt.Parameter.First().Value).ToString());
-                        if (!(b is Resource))
+                        if (!ModelInfo.IsKnownResource(b.InstanceType) && !ModelInfo.IsCoreModelTypeUri(new Uri(b.InstanceType, UriKind.RelativeOrAbsolute)))
                             throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.InstanceType);
                         else
                         {
-                            string id = (b as Resource)?.Id;
+                            string id = b.Children("id")?.FirstOrDefault()?.Value as string;
                             if (id == null)
                             {
                                 id = Guid.NewGuid().ToFhirId();
-                                if (b is Resource r)
-                                    r.Id = id;
+                                b.setProperty(pkp, "id", ElementNode.ForPrimitive(id));
                             }
-                            return new ResourceReference(b.InstanceType + "/" + id).ToTypedElement();
+                            return ElementNode.ForPrimitive(b.InstanceType + "/" + id);
                         }
                     case StructureMap.StructureMapTransform.DateOp:
                         throw new Exception("Rule \"" + ruleId + "\": Transform " + tgt.Transform.GetLiteral() + " not supported yet");
@@ -983,11 +981,18 @@ namespace Hl7.Fhir.MappingLanguage
                             throw new FHIRException("Rule \"" + ruleId + "\": Transform engine cannot point at an element of type " + b.InstanceType);
                     case StructureMap.StructureMapTransform.Cc:
                         CodeableConcept cc = new CodeableConcept();
-                        cc.Coding.Add(buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString())));
+                        if (tgt.Parameter.Count == 0)
+                            throw new Exception($"Rule \"{ruleId}\": cannot transform a codeableconcept with no parameters");
+                        if (tgt.Parameter.Count == 1)
+                            cc.Text = getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString());
+                        else
+                            cc.Coding.Add(buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()), tgt.Parameter.Count > 2 ? getParamStringNoNull(vars, tgt.Parameter[2], tgt.ToString()) : null));
                         return cc.ToTypedElement();
 
                     case StructureMap.StructureMapTransform.C:
-                        Coding c = buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
+                        if (tgt.Parameter.Count < 2)
+                            throw new Exception($"Rule \"{ruleId}\": cannot transform a Coding with less than 2 parameters");
+                        Coding c = buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()), tgt.Parameter.Count >= 2 ? getParamStringNoNull(vars, tgt.Parameter[2], tgt.ToString()) : null);
                         return c.ToTypedElement();
 
                     default:
@@ -1001,40 +1006,39 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        private Coding buildCoding(string uri, string code)
+        private Coding buildCoding(string system, string code, string display)
         {
             // if we can get this as a valueSet, we will
-            string system = null;
-            string display = null;
-            ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException<ValueSet>(uri);
-            if (vs != null)
-            {
-                var vse = worker.expandVS(vs, true, false);
-                //if (vse.getError() != null)
-                //    throw new FHIRException(vse.getError());
-                CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-                foreach (var t in vse.Contains)
-                {
-                    if (!string.IsNullOrEmpty(t.Code))
-                        b.append(t.Code);
-                    if (code.Equals(t.Code) && !string.IsNullOrEmpty(t.System))
-                    {
-                        system = t.System;
-                        display = t.Display;
-                        break;
-                    }
-                    if (code.Equals(t.Display, StringComparison.InvariantCultureIgnoreCase) && !string.IsNullOrEmpty(t.System))
-                    {
-                        system = t.System;
-                        display = t.Display;
-                        break;
-                    }
-                }
-                if (system == null)
-                    throw new FHIRException("The code '" + code + "' is not in the value set '" + uri + "' (valid codes: " + b.ToString() + "; also checked displays)");
-            }
-            else
-                system = uri;
+            //string system = null;
+            //ValueSet vs = Utilities.noString(uri) ? null : worker.fetchResourceWithException<ValueSet>(uri);
+            //if (vs != null)
+            //{
+            //    var vse = worker.expandVS(vs, true, false);
+            //    //if (vse.getError() != null)
+            //    //    throw new FHIRException(vse.getError());
+            //    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+            //    foreach (var t in vse.Contains)
+            //    {
+            //        if (!string.IsNullOrEmpty(t.Code))
+            //            b.append(t.Code);
+            //        if (code.Equals(t.Code) && !string.IsNullOrEmpty(t.System))
+            //        {
+            //            system = t.System;
+            //            display = t.Display;
+            //            break;
+            //        }
+            //        if (code.Equals(t.Display, StringComparison.InvariantCultureIgnoreCase) && !string.IsNullOrEmpty(t.System))
+            //        {
+            //            system = t.System;
+            //            display = t.Display;
+            //            break;
+            //        }
+            //    }
+            //    if (system == null)
+            //        throw new FHIRException("The code '" + code + "' is not in the value set '" + uri + "' (valid codes: " + b.ToString() + "; also checked displays)");
+            //}
+            //else
+            //    system = uri;
             ValidationResult vr = worker.validateCode(terminologyServiceOptions, system, code, null);
             if (vr != null && vr.getDisplay() != null)
                 display = vr.getDisplay();

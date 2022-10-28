@@ -1174,7 +1174,7 @@ namespace Hl7.Fhir.MappingLanguage
                 ExpressionNode node = fpe.parse(lexer);
                 target.addParameter().Value = new FhirString(node.ToString());
                 if (!node.getName().StartsWith("%"))
-                    node.setName("%"+node.getName());
+                    node.setName("%" + node.getName());
                 target.setUserData(MAP_EXPRESSION, node);
                 lexer.token(")");
             }

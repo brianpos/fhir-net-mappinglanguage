@@ -423,9 +423,14 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     else
                         ucum = lexer.readConstant("units");
+                    decimal value = 0;
+                    if (result.getConstant() is Integer i && i.Value.HasValue)
+                        value = i.Value.Value;
+                    if (result.getConstant() is FhirDecimal fd && fd.Value.HasValue)
+                        value = fd.Value.Value;
                     result.setConstant(new Quantity()
                     {
-                        Value = (result.getConstant() as FhirDecimal).Value,
+                        Value = value,
                         System = "http://unitsofmeasure.org",
                         Code = ucum,
                     });
@@ -610,7 +615,7 @@ namespace Hl7.Fhir.MappingLanguage
                     focus = group.getOpNext();
                     if (focus != null)
                     {
-                        while (focus != null && !ops.Contains(focus.getOperation().Value))
+                        while (focus != null && focus.getOperation().HasValue && !ops.Contains(focus.getOperation().Value))
                         {
                             node = focus;
                             focus = focus.getOpNext();

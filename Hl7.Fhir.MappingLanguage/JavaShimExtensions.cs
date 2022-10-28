@@ -509,7 +509,10 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
-                return en.Add(pkp, name, value.Value, value.InstanceType);
+                // clone the element in (CodeableConcept child values)
+                var ne = ElementNode.FromElement(value, true);
+                return en.Add(pkp, ne, name);
+                // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
             return null;
         }
