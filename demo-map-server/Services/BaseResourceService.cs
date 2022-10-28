@@ -166,7 +166,7 @@ namespace demo_map_server.Services
                         {
                             // narrow this list down to the type
                             var source = provider.Provide(sourceType.Url);
-                            if (source.TypeName != this.ResourceName)
+                            if (source?.TypeName != this.ResourceName)
                             {
                                 string canonicalUrl = sm.Url;
                                 if (!string.IsNullOrEmpty(sm.Version)) canonicalUrl += $"|{sm.Version}";
@@ -174,7 +174,7 @@ namespace demo_map_server.Services
                                 {
                                     Code = OperationOutcome.IssueType.Exception,
                                     Severity = OperationOutcome.IssueSeverity.Error,
-                                    Details = new CodeableConcept(null, null, $"Transform [{sm.Title ?? sm.Name ?? sm.Id}] on incompatible type {ResourceName} - map is designed for {source.TypeName}"),
+                                    Details = new CodeableConcept(null, null, $"Transform [{sm.Title ?? sm.Name ?? sm.Id}] on incompatible type {ResourceName} - map is designed for {source?.TypeName ?? "(not found)"}"),
                                     Diagnostics = canonicalUrl
                                 });
 
