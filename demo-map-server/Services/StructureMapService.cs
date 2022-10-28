@@ -148,48 +148,48 @@ namespace demo_map_server.Services
                 return outcome;
             }
 
-            var worker = new MappingWorker(this, Source);
-
-            // Scan the map for required structuredefinitions for target types
-            var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                Source,
-                (string name, out string canonical) =>
-                {
-                    // first assume it's a FHIR resource type and use that core content
-                    if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
-                    {
-                        canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
-                        return true;
-                    }
-
-                    // non FHIR types
-                    if (mapCanonicals.ContainsKey(name))
-                    {
-                        canonical = mapCanonicals[name];
-                        return true;
-                    }
-
-                    canonical = null;
-                    return false;
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-            var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
-
-            GroupComponent g = sm.Group.First();
-            var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
-            var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
-            if (s != null)
-            {
-                // narrow this list down to the type
-                tmi = provider.Provide(s.Url);
-            }
-
-            var target = ElementNode.Root(provider, tmi.TypeName);
             try
             {
+                var worker = new MappingWorker(this, Source);
+
+                // Scan the map for required structuredefinitions for target types
+                var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
+
+                IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
+                    Source,
+                    (string name, out string canonical) =>
+                    {
+                        // first assume it's a FHIR resource type and use that core content
+                        if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
+                        {
+                            canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
+                            return true;
+                        }
+
+                        // non FHIR types
+                        if (mapCanonicals.ContainsKey(name))
+                        {
+                            canonical = mapCanonicals[name];
+                            return true;
+                        }
+
+                        canonical = null;
+                        return false;
+                    });
+                var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+
+                var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
+
+                GroupComponent g = sm.Group.First();
+                var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
+                var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
+                if (s != null)
+                {
+                    // narrow this list down to the type
+                    tmi = provider.Provide(s.Url);
+                }
+
+                var target = ElementNode.Root(provider, tmi.TypeName);
                 engine.transform(null, resource.ToTypedElement(), sm, target);
                 outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
             }

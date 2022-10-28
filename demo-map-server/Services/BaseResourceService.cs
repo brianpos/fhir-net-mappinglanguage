@@ -118,73 +118,73 @@ namespace demo_map_server.Services
                         return outcome;
                     }
 
-                    var worker = new MappingWorker(sms, Source);
-
-                    // Scan the map for required structuredefinitions for target types
-                    var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
-
-                    IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                        Source,
-                        (string name, out string canonical) =>
-                        {
-                            // first assume it's a FHIR resource type and use that core content
-                            if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
-                            {
-                                canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
-                                return true;
-                            }
-
-                            // non FHIR types
-                            if (mapCanonicals.ContainsKey(name))
-                            {
-                                canonical = mapCanonicals[name];
-                                return true;
-                            }
-
-                            canonical = null;
-                            return false;
-                        });
-                    var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-                    var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
-
-                    GroupComponent g = sm.Group.First();
-                    var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
-                    var targetType = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
-                    if (targetType != null)
-                    {
-                        // narrow this list down to the type
-                        tmi = provider.Provide(targetType.Url);
-                    }
-
-                    // Check that the source parameter is of the correct type too
-                    var gs = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Source);
-                    var sourceType = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Source && s.Alias == gs.Type);
-                    if (sourceType != null)
-                    {
-                        // narrow this list down to the type
-                        var source = provider.Provide(sourceType.Url);
-                        if (source.TypeName != this.ResourceName)
-                        {
-                            string canonicalUrl = sm.Url;
-                            if (!string.IsNullOrEmpty(sm.Version)) canonicalUrl += $"|{sm.Version}";
-                            outcome.Issue.Add(new OperationOutcome.IssueComponent()
-                            {
-                                Code = OperationOutcome.IssueType.Exception,
-                                Severity = OperationOutcome.IssueSeverity.Error,
-                                Details = new CodeableConcept(null, null, $"Transform [{sm.Title ?? sm.Name ?? sm.Id}] on incompatible type {ResourceName} - map is designed for {source.TypeName}"),
-                                Diagnostics = canonicalUrl
-                            });
-
-                            outcome.SetAnnotation(HttpStatusCode.BadRequest);
-                            return outcome;
-                        }
-                    }
-
-
-                    var target = ElementNode.Root(provider, tmi.TypeName);
                     try
                     {
+                        var worker = new MappingWorker(sms, Source);
+
+                        // Scan the map for required structuredefinitions for target types
+                        var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
+
+                        IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
+                            Source,
+                            (string name, out string canonical) =>
+                            {
+                                // first assume it's a FHIR resource type and use that core content
+                                if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
+                                {
+                                    canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
+                                    return true;
+                                }
+
+                                // non FHIR types
+                                if (mapCanonicals.ContainsKey(name))
+                                {
+                                    canonical = mapCanonicals[name];
+                                    return true;
+                                }
+
+                                canonical = null;
+                                return false;
+                            });
+                        var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+
+                        var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
+
+                        GroupComponent g = sm.Group.First();
+                        var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
+                        var targetType = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
+                        if (targetType != null)
+                        {
+                            // narrow this list down to the type
+                            tmi = provider.Provide(targetType.Url);
+                        }
+
+                        // Check that the source parameter is of the correct type too
+                        var gs = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Source);
+                        var sourceType = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Source && s.Alias == gs.Type);
+                        if (sourceType != null)
+                        {
+                            // narrow this list down to the type
+                            var source = provider.Provide(sourceType.Url);
+                            if (source.TypeName != this.ResourceName)
+                            {
+                                string canonicalUrl = sm.Url;
+                                if (!string.IsNullOrEmpty(sm.Version)) canonicalUrl += $"|{sm.Version}";
+                                outcome.Issue.Add(new OperationOutcome.IssueComponent()
+                                {
+                                    Code = OperationOutcome.IssueType.Exception,
+                                    Severity = OperationOutcome.IssueSeverity.Error,
+                                    Details = new CodeableConcept(null, null, $"Transform [{sm.Title ?? sm.Name ?? sm.Id}] on incompatible type {ResourceName} - map is designed for {source.TypeName}"),
+                                    Diagnostics = canonicalUrl
+                                });
+
+                                outcome.SetAnnotation(HttpStatusCode.BadRequest);
+                                return outcome;
+                            }
+                        }
+
+
+                        var target = ElementNode.Root(provider, tmi.TypeName);
                         engine.transform(null, resource.ToTypedElement(), sm, target);
                         outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
                     }
