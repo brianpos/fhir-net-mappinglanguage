@@ -5,21 +5,49 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
+using Hl7.Fhir.StructuredDataCapture;
 using Hl7.Fhir.Utility;
 using Hl7.Fhir.WebApi;
 using System.Net;
 using static Hl7.Fhir.Model.StructureMap;
 
-namespace demo_map_server
+namespace demo_map_server.Services
 {
-    public class StructureMapService : Hl7.Fhir.DemoFileSystemFhirServer.DirectoryResourceService<IServiceProvider>, Hl7.Fhir.WebApi.IFhirResourceServiceR4<IServiceProvider>
+    public class StructureMapService : Hl7.Fhir.DemoFileSystemFhirServer.DirectoryResourceService<IServiceProvider>, IFhirResourceServiceR4<IServiceProvider>
     {
         public StructureMapService(ModelBaseInputs<IServiceProvider> requestDetails, string resourceName, string directory, IResourceResolver Source, IAsyncResourceResolver AsyncSource)
             : base(requestDetails, resourceName, directory, Source, AsyncSource)
         {
         }
 
-        public async Task<Resource> PerformOperation(string operation, Parameters operationParameters, SummaryType summary)
+        new public async Task<Resource> Create(Resource resource, string ifMatch, string ifNoneExist, DateTimeOffset? ifModifiedSince)
+        {
+            var sm = resource as StructureMap;
+            if (string.IsNullOrEmpty(sm?.Id))
+            {
+                // Check to see if this is a draft of the same canonical/version existing that we can update
+                // otherwise this is a new resource create...
+                var kvps = new List<KeyValuePair<string, string>>();
+                kvps.Add(new KeyValuePair<string, string>("url", sm.Url));
+                if (!string.IsNullOrEmpty(sm.Version))
+                    kvps.Add(new KeyValuePair<string, string>("url", sm.Url));
+                var content = await Search(kvps, null, SummaryType.False, null);
+                var current = CurrentCanonical.Current(content.Entry.Where(e => e.Resource is StructureMap).Select(e => e.Resource as StructureMap)) as StructureMap;
+                if (current != null)
+                {
+                    // copy some specific the values from the last version
+                    sm.Version = current.Version;
+                    sm.Id = current.Id;
+                    if (current.Status.HasValue)
+                        sm.Status = current.Status.Value;
+                }
+            }
+
+            var result = await base.Create(resource, ifMatch, ifNoneExist, ifModifiedSince);
+            return result;
+        }
+
+        new public async Task<Resource> PerformOperation(string operation, Parameters operationParameters, SummaryType summary)
         {
             switch (operation.ToLower())
             {
@@ -30,7 +58,7 @@ namespace demo_map_server
             return await base.PerformOperation(operation, operationParameters, summary);
         }
 
-        public async Task<Resource> PerformOperation(string id, string operation, Parameters operationParameters, SummaryType summary)
+        new public async Task<Resource> PerformOperation(string id, string operation, Parameters operationParameters, SummaryType summary)
         {
             switch (operation.ToLower())
             {
@@ -87,9 +115,14 @@ namespace demo_map_server
                 }
                 else
                 {
-                    var kvp = new KeyValuePair<string, string>("url", sourceParams.First().Value?.ToString());
-                    var content = await this.Search(new[] { kvp }, 2, SummaryType.False, null);
-                    if (!content.Entry.Any())
+                    // TODO: This should really be splitting out the versioned cannonical...
+                    var kvps = new List<KeyValuePair<string, string>>();
+                    CanonicalUrl canonicalSource = new CanonicalUrl(sourceParams.First().Value?.ToString());
+                    kvps.Add(new KeyValuePair<string, string>("url", canonicalSource.Url.Value));
+                    if (canonicalSource.Version != null)
+                        kvps.Add(new KeyValuePair<string, string>("url", canonicalSource.Version.Value));
+                    var content = await Search(kvps, null, SummaryType.False, null);
+                    if (!content.Entry.Any(e => e.Resource is IVersionableConformanceResource))
                     {
                         outcome.Issue.Add(new OperationOutcome.IssueComponent()
                         {
@@ -101,7 +134,7 @@ namespace demo_map_server
                     else
                     {
                         // Use the current version functionality to select the latest of them
-                        var current = CurrentCanonical.Current(content.Entry.Select(e => e.Resource as IVersionableConformanceResource));
+                        var current = CurrentCanonical.Current(content.Entry.Where(e => e.Resource is IVersionableConformanceResource).Select(e => e.Resource as IVersionableConformanceResource));
                         if (current is StructureMap smt)
                             sm = smt;
                     }
@@ -111,32 +144,33 @@ namespace demo_map_server
 
             if (!outcome.Success)
             {
-                outcome.SetAnnotation<HttpStatusCode>(HttpStatusCode.BadRequest);
+                outcome.SetAnnotation(HttpStatusCode.BadRequest);
                 return outcome;
             }
 
             var worker = new MappingWorker(this, Source);
+
+            // Scan the map for required structuredefinitions for target types
+            var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
                 Source,
                 (string name, out string canonical) =>
                 {
                     // first assume it's a FHIR resource type and use that core content
-                    if (ModelInfo.IsKnownResource(name))
+                    if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
                     {
                         canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
                         return true;
                     }
 
-                    switch (name)
+                    // non FHIR types
+                    if (mapCanonicals.ContainsKey(name))
                     {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left-5";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right-5";
-                            return true;
+                        canonical = mapCanonicals[name];
+                        return true;
                     }
+
                     canonical = null;
                     return false;
                 });
@@ -144,7 +178,7 @@ namespace demo_map_server
 
             var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
 
-            StructureMap.GroupComponent g = sm.Group.First();
+            GroupComponent g = sm.Group.First();
             var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
             var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
             if (s != null)
@@ -159,7 +193,7 @@ namespace demo_map_server
                 engine.transform(null, resource.ToTypedElement(), sm, target);
                 outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
                 outcome.Issue.Add(new OperationOutcome.IssueComponent()

@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.MappingLanguage;
+﻿using demo_map_server.Services;
+using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification.Source;
 using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
@@ -78,9 +79,10 @@ namespace demo_map_server
             throw new NotImplementedException();
         }
 
-        public ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value)
+        public ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, string display)
         {
-            throw new NotImplementedException();
+            // TODO: BRIAN use the terminology service to handle this properly
+            return new ValidationResult() { Display = display };
         }
     }
 

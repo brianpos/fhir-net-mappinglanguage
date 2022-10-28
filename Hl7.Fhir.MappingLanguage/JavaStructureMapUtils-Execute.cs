@@ -567,6 +567,26 @@ namespace Hl7.Fhir.MappingLanguage
             return actualType.Equals(statedType);
         }
 
+        public static Dictionary<string, string> getCanonicalTypeMapping(IWorkerContext worker, StructureMap map)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            foreach (StructureMap.StructureComponent structure in map.Structure)
+            {
+                if (structure.Mode == StructureMapModelMode.Target && !result.ContainsValue(structure.Url))
+                {
+                    StructureDefinition sd = worker.fetchResource<StructureDefinition>(structure.Url);
+                    if (sd == null)
+                        throw new FHIRException("Unable to resolve structure " + structure.Url);
+                    var url = sd.Derivation == StructureDefinition.TypeDerivationRule.Constraint ? sd.BaseDefinition : sd.Url;
+                    if (!result.ContainsValue(url))
+                        result.Add(sd.Type, url);
+                }
+            }
+
+            return result;
+
+        }
+
         private string getActualType(StructureMap map, string statedType)
         {
             // check the aliases
@@ -577,9 +597,10 @@ namespace Hl7.Fhir.MappingLanguage
                     StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
                     if (sd == null)
                         throw new FHIRException("Unable to resolve structure " + imp.Url);
-                    return sd.Id; // should be sd.Type, but R2...
+                    return sd.Type; // should be sd.Type, but R2...
                 }
             }
+
             return statedType;
         }
 
@@ -839,7 +860,6 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     case StructureMap.StructureMapTransform.Create:
                         string tn;
-                        string rawTypeName;
                         if (!tgt.Parameter.Any())
                         {
                             // we have to work out the type. First, we see if there is a single type for the target. If there is, we use that
@@ -855,26 +875,10 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         else
                         {
-                            tn = getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString());
-                            // ok, now we resolve the type name against the import statements
-                            foreach (StructureMap.StructureComponent uses in map.Structure)
-                            {
-                                if (uses.Mode == StructureMap.StructureMapModelMode.Target && !string.IsNullOrEmpty(uses.Alias) && tn.Equals(uses.Alias))
-                                {
-                                    tn = uses.Url;
-                                    break;
-                                }
-                            }
+                            var reqType = getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString());
+                            tn = getActualType(map, reqType);
                         }
-                        rawTypeName = tn;
-                        if (services == null)
-                        {
-                            if (tn.StartsWith(ModelInfo.FhirCoreProfileBaseUri.OriginalString))
-                            {
-                                rawTypeName = tn.Substring(ModelInfo.FhirCoreProfileBaseUri.OriginalString.Length);
-                            }
-                        }
-                        ITypedElement res = services != null ? services.createType(context.getAppInfo(), tn) : ElementNode.Root(pkp, rawTypeName) as ITypedElement;
+                        ITypedElement res = services != null ? services.createType(context.getAppInfo(), tn) : ElementNode.Root(pkp, tn) as ITypedElement;
                         if (!res.InstanceType.Equals("Parameters"))
                         {
                             //	        res.setIdBase(tgt.Parameter.Count() > 1 ? getParamString(vars, tgt.Parameter.First()) : UUID.randomUUID().ToString().toLowerCase());

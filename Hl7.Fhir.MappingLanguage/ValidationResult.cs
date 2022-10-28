@@ -37,7 +37,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         internal string getDisplay()
         {
-            throw new NotImplementedException();
+            return Display;
         }
     }
 }

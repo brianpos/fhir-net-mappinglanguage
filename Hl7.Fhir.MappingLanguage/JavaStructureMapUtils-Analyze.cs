@@ -204,7 +204,7 @@ namespace Hl7.Fhir.MappingLanguage
             T fetchResource<T>(string url) where T : Resource;
             ValueSet.ExpansionComponent expandVS(ValueSet vs, bool v1, bool v2);
             string getOverrideVersionNs();
-            ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value);
+            ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, string display);
             StructureDefinition fetchTypeDefinition(string code);
             T fetchResourceWithException<T>(string uri) where T : Resource;
 
@@ -260,7 +260,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (_object == null)
                     return null;
                 if (ModelInfo.IsPrimitive(_object.InstanceType))
-                    return _name + ": \"" + _object.Value.ToString() + '"';
+                    return _name + ": \"" + _object.Value?.ToString() + '"';
                 return _name + ": (" + _object.InstanceType + ")";
             }
         }

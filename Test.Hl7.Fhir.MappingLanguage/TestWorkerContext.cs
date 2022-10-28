@@ -78,9 +78,9 @@ namespace Test.FhirMappingLanguage
             throw new NotImplementedException();
         }
 
-        public ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, object value)
+        public ValidationResult validateCode(TerminologyServiceOptions terminologyServiceOptions, string system, string code, string display)
         {
-            throw new NotImplementedException();
+            return new ValidationResult() { Display = display };
         }
     }
 }
