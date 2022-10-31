@@ -105,7 +105,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
             FhirPathCompiler fpc = new FhirPathCompiler(st);
             var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
+            var results = exprCompiled(data, new FhirEvaluationContext());
             if (!results.Any())
                 return null;
             if (results.First().InstanceType == "string")
@@ -138,7 +138,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
             FhirPathCompiler fpc = new FhirPathCompiler(st);
             var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled.Invoke(data, new FhirEvaluationContext());
+            var results = exprCompiled(data, new FhirEvaluationContext());
             return results;
         }
     }

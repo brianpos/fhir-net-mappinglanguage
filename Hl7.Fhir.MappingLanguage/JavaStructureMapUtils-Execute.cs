@@ -207,6 +207,23 @@ namespace Hl7.Fhir.MappingLanguage
             fpe.setHostServices(new FFHIRPathHostServices());
         }
 
+        public ElementNode GenerateEmptyTargetOutputStructure(StructureMap sm)
+        {
+            var typeInfo = pkp.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
+
+            GroupComponent g = sm.Group.First();
+            var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
+            var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
+            if (s != null)
+            {
+                // narrow this list down to the type
+                typeInfo = pkp.Provide(s.Url);
+            }
+
+            var target = ElementNode.Root(pkp, typeInfo.TypeName);
+            return target;
+        }
+
         private void log(string cnt)
         {
             if (services != null)

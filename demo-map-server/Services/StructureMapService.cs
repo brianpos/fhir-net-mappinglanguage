@@ -176,20 +176,9 @@ namespace demo_map_server.Services
                         canonical = null;
                         return false;
                     });
+
                 var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-                var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
-
-                GroupComponent g = sm.Group.First();
-                var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
-                var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Target && s.Alias == gt.Type);
-                if (s != null)
-                {
-                    // narrow this list down to the type
-                    tmi = provider.Provide(s.Url);
-                }
-
-                var target = ElementNode.Root(provider, tmi.TypeName);
+                var target = engine.GenerateEmptyTargetOutputStructure(sm);
                 engine.transform(null, resource.ToTypedElement(), sm, target);
                 outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
             }
