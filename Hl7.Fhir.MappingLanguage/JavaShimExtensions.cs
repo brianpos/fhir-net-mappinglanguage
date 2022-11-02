@@ -511,6 +511,25 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 // clone the element in (CodeableConcept child values)
                 var ne = ElementNode.FromElement(value, true);
+                if (me.Definition != null)
+                {
+                    // Check if this is a multi-cardinality item
+                    var cd = me.ChildDefinitions(pkp).FirstOrDefault(cd => cd.ElementName== name);
+                    if (cd != null)
+                    {
+                        if (!cd.IsCollection)
+                        {
+                            // Remove any existing values
+                            if (me.Children(name).Any())
+                            {
+                                System.Diagnostics.Trace.WriteLine($"Replacing an existing node {name} at {me.Location}");
+                                en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
+                                return ne;
+                            }
+                        }
+                    }
+                }
+                System.Diagnostics.Trace.WriteLine($"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
                 return en.Add(pkp, ne, name);
                 // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
@@ -521,7 +540,9 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
-                return en.Add(pkp, name);
+                System.Diagnostics.Trace.WriteLine($"MakeProp {name} context: {me.Location}");
+                var result = en.Add(pkp, name);
+                return result;
             }
             return null;
         }

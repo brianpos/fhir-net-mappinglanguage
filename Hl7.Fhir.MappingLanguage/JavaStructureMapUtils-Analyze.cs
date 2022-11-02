@@ -261,6 +261,8 @@ namespace Hl7.Fhir.MappingLanguage
                     return null;
                 if (ModelInfo.IsPrimitive(_object.InstanceType))
                     return _name + ": \"" + _object.Value?.ToString() + '"';
+                if (ModelInfo.IsKnownResource(_object.InstanceType))
+                    return _name + ": \"" + _object.Value?.DebuggerDisplayString() ?? _object.Value?.GetHashCode().ToString() + '"';
                 return _name + ": (" + _object.InstanceType + ")";
             }
         }

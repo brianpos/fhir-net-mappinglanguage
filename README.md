@@ -4,6 +4,12 @@ https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/ma
 
 The file/code structure is planned to remain inline with the java implementation to ease maintenance.
 
+Possible uses:
+* between versions of FHIR
+* data exaction for SDH (SDOH etc)
+* from US Core to IPA
+* other formats to/from FHIR
+
 ## Release notes ##
 Not released yet!
 

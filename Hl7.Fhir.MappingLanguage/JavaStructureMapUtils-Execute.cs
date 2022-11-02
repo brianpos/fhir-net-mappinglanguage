@@ -744,7 +744,7 @@ namespace Hl7.Fhir.MappingLanguage
                         remove.Add(item);
                     }
                     else
-                        log(indent + "  condition [" + src.Condition + "] for " + item.ToString() + " : true");
+                        log(indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
                 }
                 items.RemoveAll(r => remove.Contains(r));
             }
@@ -903,6 +903,7 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         if (tgt.hasUserData("profile"))
                             res.setUserData("profile", tgt.getUserData("profile"));
+                        System.Diagnostics.Trace.WriteLine($"Create {tn}");
                         return res;
 
                     case StructureMap.StructureMapTransform.Copy:
