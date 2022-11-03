@@ -3,6 +3,7 @@ using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
 using Hl7.Fhir.StructuredDataCapture;
@@ -78,6 +79,26 @@ namespace demo_map_server.Services
             var outcome = new OperationOutcome();
             Resource resource = operationParameters["resource"]?.Resource ?? operationParameters["content"]?.Resource;
             StructureMap sm = operationParameters["map"]?.Resource as StructureMap;
+            if (operationParameters["map"]?.Value is FhirString mapString)
+            {
+                // This is a workaround to support passing the raw map as a string as a resource parameter
+                try
+                {
+                    var parser = new StructureMapUtilitiesParse();
+                    sm = parser.parse(mapString.Value, "map");
+                }
+                catch (Exception ex)
+                {
+                    outcome.Issue.Add(new OperationOutcome.IssueComponent()
+                    {
+                        Code = OperationOutcome.IssueType.Exception,
+                        Severity = OperationOutcome.IssueSeverity.Error,
+                        Details = new CodeableConcept(null, null, "Error parsing the map to transform with"),
+                        Diagnostics = ex.Message
+                    });
+
+                }
+            }
 
             var resourceParams = operationParameters.Parameter.Where(p => p.Name == "resource" || p.Name == "content");
             if (resourceParams.Count() > 1)
@@ -177,9 +198,62 @@ namespace demo_map_server.Services
                         return false;
                     });
 
-                var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+                var mapServices = new InlineServices(outcome);
+                var engine = new StructureMapUtilitiesExecute(worker, mapServices, provider);
                 var target = engine.GenerateEmptyTargetOutputStructure(sm);
                 engine.transform(null, resource.ToTypedElement(), sm, target);
+
+                if (outcome.Success)
+                {
+                    // resource validated fine, add an information message to report it
+                    string summaryMessage = $"Transformation of '{resource.TypeName}/{resource.Id}' was successful";
+                    if (outcome.Warnings > 0)
+                        summaryMessage += $" (with {outcome.Warnings} warnings)";
+                    outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
+                    {
+                        Code = OperationOutcome.IssueType.Informational,
+                        Severity = OperationOutcome.IssueSeverity.Information,
+                        Details = new CodeableConcept(null, null, summaryMessage)
+                    });
+                }
+
+                if (operationParameters["debug"]?.Value != null)
+                {
+                    // This is a debug mode request, so return in the parameters format!
+                    var resultP = new Parameters();
+                    var rp = new Parameters.ParameterComponent()
+                    {
+                        Name = "result",
+                        Value = new FhirString("Result")
+                    };
+                    resultP.Parameter.Add(rp);
+                    rp.Part.Add(new Parameters.ParameterComponent()
+                    {
+                        Name = "outcome",
+                        Resource = outcome
+                    });
+                    rp.Part.Add(new Parameters.ParameterComponent()
+                    {
+                        Name = "result",
+                        Value = new FhirString(target.ToJson(new FhirJsonSerializationSettings() { Pretty = true }))
+                    });
+
+                    // add in the trace messages
+                    var resultTrace = new Parameters.ParameterComponent()
+                    {
+                        Name = "trace",
+                    };
+                    rp.Part.Add(resultTrace);
+                    foreach (var log in mapServices.LogMessages)
+                    {
+                        resultTrace.Part.Add(new Parameters.ParameterComponent()
+                        {
+                            Name = log.Key,
+                            Value = new FhirString(log.Value)
+                        });
+                    }
+                    return resultP;
+                }
                 outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
             }
             catch (Exception ex)
@@ -193,20 +267,53 @@ namespace demo_map_server.Services
                 });
             }
 
-            if (outcome.Success)
-            {
-                // resource validated fine, add an information message to report it
-                string summaryMessage = $"Transformation of '{resource.TypeName}/{resource.Id}' was successful";
-                if (outcome.Warnings > 0)
-                    summaryMessage += $" (with {outcome.Warnings} warnings)";
-                outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
-                {
-                    Code = OperationOutcome.IssueType.Informational,
-                    Severity = OperationOutcome.IssueSeverity.Information,
-                    Details = new CodeableConcept(null, null, summaryMessage)
-                });
-            }
             return outcome;
+        }
+
+        private class InlineServices : StructureMapUtilitiesAnalyze.ITransformerServices
+        {
+            public List<KeyValuePair<string, string>> LogMessages { get; private set; } = new List<KeyValuePair<string, string>>();
+            internal InlineServices(OperationOutcome outcome)
+            {
+                _outcome = outcome;
+            }
+            private OperationOutcome _outcome;
+            public ITypedElement createResource(object appInfo, ITypedElement res, bool atRootofTransform)
+            {
+                throw new NotImplementedException();
+            }
+
+            public ITypedElement createType(object appInfo, string name)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void log(string category, string message)
+            {
+                LogMessages.Add(new KeyValuePair<string, string>(category, message));
+
+                //_outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
+                //{
+                //    Code = OperationOutcome.IssueType.Informational,
+                //    Severity = OperationOutcome.IssueSeverity.Information,
+                //    Details = new CodeableConcept(null, null, message)
+                //});
+            }
+
+            public List<ITypedElement> performSearch(object appContext, string url)
+            {
+                throw new NotImplementedException();
+            }
+
+            public ITypedElement resolveReference(object appContext, string url)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Coding translate(object appInfo, Coding source, string conceptMapUrl)
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }

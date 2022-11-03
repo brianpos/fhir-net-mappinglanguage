@@ -224,12 +224,12 @@ namespace Hl7.Fhir.MappingLanguage
             return target;
         }
 
-        private void log(string cnt)
+        private void log(string category, string message)
         {
             if (services != null)
-                services.log(cnt);
+                services.log(category, message);
             else
-                System.Diagnostics.Trace.WriteLine(cnt);
+                System.Diagnostics.Trace.WriteLine($"{category}: {message}");
         }
 
         /**
@@ -257,7 +257,7 @@ namespace Hl7.Fhir.MappingLanguage
         public void transform(Object appInfo, ITypedElement source, StructureMap map, ElementNode target)
         {
             TransformContext context = new TransformContext(appInfo);
-            log("Start Transform " + map.Url);
+            log("debug", "Start Transform " + map.Url);
             StructureMap.GroupComponent g = map.Group.First();
 
             Variables vars = new Variables();
@@ -287,7 +287,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeGroup(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, bool atRoot)
         {
-            log(indent + "Group : " + group.Name + "; vars = " + vars.summary());
+            log("debug", indent + "Group : " + group.Name + "; vars = " + vars.summary());
             // todo: check inputs
             if (!string.IsNullOrEmpty(group.Extends))
             {
@@ -303,7 +303,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
-            log(indent + "rule : " + rule.Name + "; vars = " + vars.summary());
+            log("debug", indent + "rule : " + rule.Name + "; vars = " + vars.summary());
             Variables srcVars = vars.copy();
             if (rule.Source.Count() != 1)
                 throw new FHIRException("Rule \"" + rule.Name + "\": not handled yet");
@@ -336,7 +336,7 @@ namespace Hl7.Fhir.MappingLanguage
                           && !rule.getTargetFirstRep().Parameter.Any())
                     {
                         // simple inferred, map by type
-                        System.Diagnostics.Trace.WriteLine(v.summary());
+                        log("debug", v.summary());
                         ITypedElement src = v.getInputVar(rule.getSourceFirstRep().Variable);
                         ElementNode tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
                         string srcType = src.InstanceType;
@@ -740,11 +740,11 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
                     {
-                        log(indent + "  condition [" + src.Condition + "] for " + item.ToString() + " : false");
+                        log("debug", indent + "  condition [" + src.Condition + "] for " + item.ToString() + " : false");
                         remove.Add(item);
                     }
                     else
-                        log(indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
+                        log("debug", indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
                 }
                 items.RemoveAll(r => remove.Contains(r));
             }
@@ -779,7 +779,7 @@ namespace Hl7.Fhir.MappingLanguage
                 foreach (ITypedElement item in items)
                     b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
                 if (b.Length() > 0)
-                    services.log(b.ToString());
+                    services.log("info", b.ToString());
             }
 
             if (src.ListMode.HasValue && items.Any())
@@ -903,7 +903,7 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         if (tgt.hasUserData("profile"))
                             res.setUserData("profile", tgt.getUserData("profile"));
-                        System.Diagnostics.Trace.WriteLine($"Create {tn}");
+                        log("debug", $"Create {tn}");
                         return res;
 
                     case StructureMap.StructureMapTransform.Copy:

@@ -108,10 +108,10 @@ namespace Hl7.Fhir.MappingLanguage
             var results = exprCompiled(data, new FhirEvaluationContext());
             if (!results.Any())
                 return null;
-            if (results.First().InstanceType == "string")
-                return results.First().Value.ToString();
-            if (ModelInfo.IsPrimitive(results.First().InstanceType))
-                return results.First().Value.ToString();
+            if (results.First().Value is string str)
+                return str;
+            if (results.First().Value is FhirString fstr)
+                return fstr.Value;
             // TODO: BRIAN Should this throw if you don't get what you expect?
             return null;
         }
