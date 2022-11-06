@@ -220,30 +220,39 @@ namespace demo_map_server.Services
                 if (operationParameters["debug"]?.Value != null)
                 {
                     // This is a debug mode request, so return in the parameters format!
-                    var resultP = new Parameters();
-                    var rp = new Parameters.ParameterComponent()
-                    {
-                        Name = "result",
-                        Value = new FhirString("Result")
-                    };
-                    resultP.Parameter.Add(rp);
-                    rp.Part.Add(new Parameters.ParameterComponent()
+                    var result = new Parameters();
+
+                    // The outcome resource from the generation
+                    result.Parameter.Add(new Parameters.ParameterComponent()
                     {
                         Name = "outcome",
                         Resource = outcome
                     });
-                    rp.Part.Add(new Parameters.ParameterComponent()
-                    {
-                        Name = "result",
-                        Value = new FhirString(target.ToJson(new FhirJsonSerializationSettings() { Pretty = true }))
-                    });
 
-                    // add in the trace messages
+                    // actual transformed object
+                    if (target != null)
+                    {
+                        result.Parameter.Add(new Parameters.ParameterComponent()
+                        {
+                            Name = "result",
+                            Value = new FhirString(target.ToJson(new FhirJsonSerializationSettings() { Pretty = true }))
+                        });
+                    }
+
+
+                    // Any processing parameters
+                    // (including the map that was used to evaluate the request - in StructureMap format)
+                    var configParams = new Parameters.ParameterComponent() { Name = "parameters" };
+                    configParams.Part.Add(new Parameters.ParameterComponent() { Name = "evaluator", Value = new FhirString(".NET (brianpos) 4.3.0 alpha-1") });
+                    configParams.Part.Add(new Parameters.ParameterComponent() { Name = "map", Resource = sm });
+                    result.Parameter.Add(configParams);
+
+                    // The Trace/debug processing messages
                     var resultTrace = new Parameters.ParameterComponent()
                     {
                         Name = "trace",
                     };
-                    rp.Part.Add(resultTrace);
+                    result.Parameter.Add(resultTrace);
                     foreach (var log in mapServices.LogMessages)
                     {
                         resultTrace.Part.Add(new Parameters.ParameterComponent()
@@ -252,7 +261,7 @@ namespace demo_map_server.Services
                             Value = new FhirString(log.Value)
                         });
                     }
-                    return resultP;
+                    return result;
                 }
                 outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
             }
