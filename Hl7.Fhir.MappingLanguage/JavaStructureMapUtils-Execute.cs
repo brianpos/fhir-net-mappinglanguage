@@ -925,7 +925,7 @@ namespace Hl7.Fhir.MappingLanguage
                             }
                             else if (tgt.Parameter.Count == 2)
                                 expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
-                            tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
+                            tgt.setUserData(MAP_EXPRESSION, expr);
                         }
                         IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);
                         if (v.Count() == 0)
