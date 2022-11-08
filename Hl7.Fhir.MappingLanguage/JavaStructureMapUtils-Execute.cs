@@ -248,9 +248,16 @@ namespace Hl7.Fhir.MappingLanguage
          */
         protected void getChildrenByName(ITypedElement item, string name, List<ITypedElement> result)
         {
+            if (ModelInfo.IsPrimitive(item.InstanceType) && name == "value")
+            {
+                result.Add(ElementNode.ForPrimitive(item.Value));
+                return;
+            }
             foreach (ITypedElement v in item.Children(name))
+            {
                 if (v != null)
                     result.Add(v);
+            }
         }
 
 
