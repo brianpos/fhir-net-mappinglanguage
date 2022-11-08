@@ -5,6 +5,7 @@ using Hl7.Fhir.Specification.Source;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
 
 namespace Test.FhirMappingLanguage
@@ -12,9 +13,27 @@ namespace Test.FhirMappingLanguage
     public class TestWorker : IWorkerContext
     {
         IResourceResolver _source;
-        public TestWorker(IResourceResolver source)
+        List<StructureMap> _maps = new List<StructureMap>();
+        public TestWorker(IResourceResolver source, string directoryToAllMaps = null)
         {
             _source = source;
+            if (!string.IsNullOrEmpty(directoryToAllMaps))
+            {
+                foreach (var file in System.IO.Directory.GetFiles(directoryToAllMaps, "*.map"))
+                {
+                    var expression = System.IO.File.ReadAllText(file);
+                    var parser = new StructureMapUtilitiesParse();
+                    try
+                    {
+                    var sm = parser.parse(expression, null);
+                    _maps.Add(sm);
+                    }
+                    catch(Exception ex)
+                    {
+                        System.Diagnostics.Trace.WriteLine($"Error scanning {file} {ex.Message}");
+                    }
+                }
+            }
         }
 
         public ValueSet.ExpansionComponent expandVS(ValueSet vs, bool v1, bool v2)
@@ -65,12 +84,12 @@ namespace Test.FhirMappingLanguage
 
         public StructureMap getTransform(string value)
         {
-            throw new NotImplementedException();
+            return _maps.FirstOrDefault(m => m.Url == value);
         }
 
-        public IEnumerable<StructureMap> listTransforms()
+        public IEnumerable<StructureMap> listTransforms(string canonicalUrlTemplate)
         {
-            throw new NotImplementedException();
+            return _maps;
         }
 
         public string oid2Uri(string code)

@@ -438,15 +438,21 @@ namespace Hl7.Fhir.MappingLanguage
             return result;
         }
 
-        private List<StructureMap> findMatchingMaps(string value)
+        /// <summary>
+        /// Find any Maps that match the given template
+        /// </summary>
+        /// <param name="canonicalUrlTemplate">this could be a regular canonical URL, or could include the wildcard char *</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        private List<StructureMap> findMatchingMaps(string canonicalUrlTemplate)
         {
             List<StructureMap> res = new List<StructureMap>();
-            if (value.Contains("*"))
+            if (canonicalUrlTemplate.Contains("*"))
             {
                 // TODO: BRIAN Note: this looks like a real runtime performance possible penalty
-                foreach (StructureMap sm in worker.listTransforms())
+                foreach (StructureMap sm in worker.listTransforms(canonicalUrlTemplate))
                 {
-                    if (urlMatches(value, sm.Url))
+                    if (urlMatches(canonicalUrlTemplate, sm.Url))
                     {
                         res.Add(sm);
                     }
@@ -454,7 +460,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
             else
             {
-                StructureMap sm = worker.getTransform(value);
+                StructureMap sm = worker.getTransform(canonicalUrlTemplate);
                 if (sm != null)
                     res.Add(sm);
             }

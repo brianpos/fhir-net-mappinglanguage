@@ -1,7 +1,11 @@
 ﻿using demo_map_server.Services;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
+using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
+using Hl7.Fhir.StructuredDataCapture;
+using Hl7.Fhir.WebApi;
 using static Hl7.Fhir.MappingLanguage.StructureMapUtilitiesAnalyze;
 
 namespace demo_map_server
@@ -63,15 +67,44 @@ namespace demo_map_server
             // throw new NotImplementedException();
         }
 
-        public StructureMap getTransform(string value)
+        /// <summary>
+        /// Retrieve by the canonical URL
+        /// </summary>
+        /// <param name="canonicalUrl"></param>
+        /// <returns></returns>
+        public StructureMap getTransform(string canonicalUrl)
         {
-            // TODO: BRIAN unclear if this is a canonical or the actual ID of the resource
-            return _service.Get(value, null, Hl7.Fhir.Rest.SummaryType.False).Result as StructureMap;
+            var kvps = new List<KeyValuePair<string, string>>();
+            CanonicalUrl sm = new CanonicalUrl(canonicalUrl);
+            kvps.Add(new KeyValuePair<string, string>("url", sm.Url.Value));
+            if (sm.Version != null)
+                kvps.Add(new KeyValuePair<string, string>("url", sm.Url.Value));
+            var content = _service.Search(kvps, null, SummaryType.False, null).WaitResult();
+            return CurrentCanonical.Current(content.Entry.Where(e => e.Resource is StructureMap).Select(e => e.Resource as StructureMap)) as StructureMap;
         }
 
-        public IEnumerable<StructureMap> listTransforms()
+        public IEnumerable<StructureMap> listTransforms(string canonicalUrlTemplate)
         {
-            throw new NotImplementedException();
+            if (_service.Indexer.MemoryIndex.ContainsKey("StructureMap#url"))
+            {
+                var map = _service.Indexer.MemoryIndex["StructureMap#url"];
+                List<StructureMap> maps = new List<StructureMap>();
+                foreach (var kvp in map)
+                { 
+                    if (urlMatches(canonicalUrlTemplate, kvp.Key))
+                    {
+                        maps.Add(new FhirXmlParser().Parse<StructureMap>(File.ReadAllText(kvp.Value.First())));
+                    }
+                }
+                return maps;
+
+            }
+            return null;
+        }
+
+        private bool urlMatches(string mask, string url)
+        {
+            return url.Length > mask.Length && url.StartsWith(mask.Substring(0, mask.IndexOf("*"))) && url.EndsWith(mask.Substring(mask.IndexOf("*") + 1));
         }
 
         public string oid2Uri(string code)

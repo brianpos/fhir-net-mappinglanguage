@@ -212,7 +212,7 @@ namespace Hl7.Fhir.MappingLanguage
             /// All known transforms registered in the system (indexable by URL)
             /// </summary>
             /// <returns></returns>
-            IEnumerable<StructureMap> listTransforms();
+            IEnumerable<StructureMap> listTransforms(string canonicalUrlTemplate);
 
             /// <summary>
             /// Retrieve a StructureMap (by canonical URL)
