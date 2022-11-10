@@ -505,7 +505,7 @@ namespace Hl7.Fhir.MappingLanguage
         //    return null;
         //}
 
-        public static ITypedElement setProperty(this ITypedElement me, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
+        public static ITypedElement setProperty(this ITypedElement me, Action<string, string> Log, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
         {
             if (me is ElementNode en)
             {
@@ -522,25 +522,25 @@ namespace Hl7.Fhir.MappingLanguage
                             // Remove any existing values
                             if (me.Children(name).Any())
                             {
-                                System.Diagnostics.Trace.WriteLine($"Replacing an existing node {name} at {me.Location}");
+                                Log("prop", $"Replacing an existing node {name} at {me.Location}");
                                 en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
                                 return ne;
                             }
                         }
                     }
                 }
-                System.Diagnostics.Trace.WriteLine($"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
+                Log("prop", $"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
                 return en.Add(pkp, ne, name);
                 // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
             return null;
         }
 
-        public static ITypedElement makeProperty(this ITypedElement me, IStructureDefinitionSummaryProvider pkp, string name)
+        public static ITypedElement makeProperty(this ITypedElement me, Action<string, string> Log, IStructureDefinitionSummaryProvider pkp, string name)
         {
             if (me is ElementNode en)
             {
-                System.Diagnostics.Trace.WriteLine($"MakeProp {name} context: {me.Location}");
+                Log("prop", $"MakeProp {name} context: {me.Location}");
                 var result = en.Add(pkp, name);
                 return result;
             }

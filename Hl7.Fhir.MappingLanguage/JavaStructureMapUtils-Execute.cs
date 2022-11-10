@@ -858,7 +858,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 v = runTransform(ruleId, context, map, group, tgt, vars, dest, tgt.Element, srcVar, atRoot);
                 if (v != null && dest != null)
-                    v = dest.setProperty(pkp, tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
+                    v = dest.setProperty(log, pkp, tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
             }
             else if (dest != null)
             {
@@ -867,13 +867,13 @@ namespace Hl7.Fhir.MappingLanguage
                     v = sharedVars.get(VariableMode.SHARED, tgt.ListRuleId);
                     if (v == null)
                     {
-                        v = dest.makeProperty(pkp, tgt.Element);
+                        v = dest.makeProperty(log, pkp, tgt.Element);
                         sharedVars.add(VariableMode.SHARED, tgt.ListRuleId, v);
                     }
                 }
                 else
                 {
-                    v = dest.makeProperty(pkp, tgt.Element);
+                    v = dest.makeProperty(log, pkp, tgt.Element);
                 }
             }
             if (!string.IsNullOrEmpty(tgt.Variable) && v != null)
@@ -993,7 +993,7 @@ namespace Hl7.Fhir.MappingLanguage
                             if (id == null)
                             {
                                 id = Guid.NewGuid().ToFhirId();
-                                b.setProperty(pkp, "id", ElementNode.ForPrimitive(id));
+                                b.setProperty(log, pkp, "id", ElementNode.ForPrimitive(id));
                             }
                             return ElementNode.ForPrimitive(b.InstanceType + "/" + id);
                         }
