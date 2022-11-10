@@ -1,16 +1,13 @@
 using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.FhirPath;
-using Hl7.Fhir.Language.Debugging;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
-using Hl7.FhirPath;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.Resources;
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Diagnostics.Contracts;
+using System.IO;
+using System.IO.Compression;
+using System.Net.Http;
 using Test.Hl7.Fhir.MappingLanguage;
 
 namespace Test.FhirMappingLanguage
