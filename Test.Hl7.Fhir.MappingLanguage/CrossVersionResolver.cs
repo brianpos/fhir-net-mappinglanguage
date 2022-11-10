@@ -46,6 +46,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
             var settingsJson = new FhirJsonParsingSettings() { PermissiveParsing = true };
             var settingsXml = new FhirXmlParsingSettings() { PermissiveParsing = true };
             var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml };
+
             stu3 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r3.core#3.0.2\package", settingsDir);
             stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
             r4 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r4b.core#4.3.0\package", settingsDir);
@@ -112,11 +113,18 @@ namespace Test.Hl7.Fhir.MappingLanguage
         {
             string convertedUrl = ConvertCanonical(uri);
             Canonical cu = new Canonical(convertedUrl);
+            Resource result;
             if (cu.Version() == "3.0")
-                return stu3.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
-            if (cu.Version() == "5.0")
-                return r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
-            return r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+                result = stu3.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+            else if (cu.Version() == "5.0")
+                result = r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+            else
+            result = r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+            if (result == null)
+            {
+                System.Diagnostics.Trace.WriteLine($"Failed to resolve: {uri} at [{cu.Version()}] {cu.BaseCanonicalUrl()}");
+            }
+            return result;
         }
 
         public Resource ResolveByUri(string uri)
