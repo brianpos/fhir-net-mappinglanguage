@@ -3,11 +3,13 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
 using Hl7.Fhir.Utility;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Resources;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -27,6 +29,19 @@ namespace Test.Hl7.Fhir.MappingLanguage
             return result;
         }
 
+        public static void Version(this Canonical url, string version)
+        {
+            if (string.IsNullOrEmpty(version))
+                return;
+
+            string newUrl = $"{url.BaseCanonicalUrl()}|{version}";
+            string fragment = url.Fragment();
+            int indexOfVersion = url.Value.IndexOf("|");
+            if (!string.IsNullOrEmpty(fragment))
+                newUrl += $"#{fragment}";
+            url.Value = newUrl;
+        }
+
         public static string BaseCanonicalUrl(this Canonical url)
         {
             int indexOfVersion = url.Value.IndexOf("|");
@@ -36,6 +51,81 @@ namespace Test.Hl7.Fhir.MappingLanguage
             if (indexOfFragment != -1)
                 return url.Value.Substring(0, indexOfFragment);
             return url.Value;
+        }
+
+        public static string Fragment(this Canonical url)
+        {
+            int indexOfFragment = url.Value.IndexOf("#");
+            if (indexOfFragment != -1)
+                return url.Value.Substring(0, indexOfFragment);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// This resolver will take any non version specific question and then resolve with
+    /// the designated version number
+    /// </summary>
+    internal class FixedVersionResolver : IResourceResolver
+    {
+        public FixedVersionResolver(string version, IResourceResolver source)
+        {
+            _fixedVersion = version;
+            _source = source;
+        }
+        private string _fixedVersion;
+        private IResourceResolver _source;
+
+        public Resource ResolveByCanonicalUri(string uri)
+        {
+            Canonical cu = new Canonical(uri);
+            if (string.IsNullOrWhiteSpace(cu.Version()))
+                cu.Version(_fixedVersion);
+            return _source.ResolveByCanonicalUri(cu);
+        }
+
+        public Resource ResolveByUri(string uri)
+        {
+            Canonical cu = new Canonical(uri);
+            if (string.IsNullOrWhiteSpace(cu.Version()))
+                cu.Version(_fixedVersion);
+            return _source.ResolveByUri(cu);
+        }
+    }
+
+    internal class VersionFilterResolver : IResourceResolver
+    {
+        public VersionFilterResolver(string version, IResourceResolver source)
+        {
+            _fixedVersion = version;
+            _source = source;
+        }
+        private string _fixedVersion;
+        private IResourceResolver _source;
+
+        public Resource ResolveByCanonicalUri(string uri)
+        {
+            string convertedUrl = CrossVersionResolver.ConvertCanonical(uri);
+            Canonical cu = new Canonical(convertedUrl);
+            if (!string.IsNullOrWhiteSpace(cu.Version()))
+            {
+                if (cu.Version() != _fixedVersion)
+                    return null;
+            }
+            var result = _source.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+            return result;
+        }
+
+        public Resource ResolveByUri(string uri)
+        {
+            string convertedUrl = CrossVersionResolver.ConvertCanonical(uri);
+            Canonical cu = new Canonical(convertedUrl);
+            if (!string.IsNullOrWhiteSpace(cu.Version()))
+            {
+                if (cu.Version() != _fixedVersion)
+                    return null;
+            }
+            return _source.ResolveByUri(cu.BaseCanonicalUrl());
         }
     }
 
@@ -53,6 +143,11 @@ namespace Test.Hl7.Fhir.MappingLanguage
             r5 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r5.core#5.0.0-ballot\package", settingsDir);
         }
 
+        public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }
+        public IResourceResolver OnlyR4 { get { return new VersionFilterResolver("4.0", r4); } }
+        public IResourceResolver OnlyR4B { get { return new VersionFilterResolver("4.3", r4); } }
+        public IResourceResolver OnlyR5 { get { return new VersionFilterResolver("5.0", r5); } }
+
         void CustomExceptionHandler(object source, ExceptionNotification args)
         {
             // System.Diagnostics.Trace.WriteLine(args.Message);
@@ -63,7 +158,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
         DirectorySource r5;
         const string fhirBaseCanonical = "http://hl7.org/fhir/";
 
-        private string ConvertCanonical(string uri)
+        public static string ConvertCanonical(string uri)
         {
             // convert this from the old format into the versioned format
             // http://hl7.org/fhir/3.0/StructureDefinition/Account
@@ -119,7 +214,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
             else if (cu.Version() == "5.0")
                 result = r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
             else
-            result = r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+                result = r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
             if (result == null)
             {
                 System.Diagnostics.Trace.WriteLine($"Failed to resolve: {uri} at [{cu.Version()}] {cu.BaseCanonicalUrl()}");

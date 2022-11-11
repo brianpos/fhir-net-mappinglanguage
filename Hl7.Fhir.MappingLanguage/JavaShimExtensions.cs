@@ -427,14 +427,10 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me != null)
             {
-                var ti = pkp.Provide(me.InstanceType);
-                if (ti != null)
+                var cd = me.ChildDefinitions(pkp).Where(e => e.ElementName == name);
+                if (cd != null)
                 {
-                    var eds = ti.GetElements().Where(e => e.ElementName == name);
-                    if (eds != null)
-                    {
-                        return eds.SelectMany(e => e.Type.Select(t => t.GetTypeName())).ToArray();
-                    }
+                    return cd.SelectMany(e => e.Type.Select(t => t.GetTypeName())).ToArray();
                 }
             }
             return null;

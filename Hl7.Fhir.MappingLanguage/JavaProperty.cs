@@ -186,7 +186,7 @@ namespace Hl7.Fhir.MappingLanguage
          *
          * @param E.g. "integer"
          */
-        public bool isPrimitive(String code)
+        public static bool isPrimitive(String code)
         {
             return ModelInfo.IsPrimitive(code);
             // was this... but this can be very inefficient compared to hard coding the list

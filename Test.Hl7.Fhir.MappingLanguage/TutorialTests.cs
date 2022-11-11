@@ -99,9 +99,10 @@ namespace Test.FhirMappingLanguage
             var source1 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step1\source\source1.xml");
             var sourceNode = FhirXmlNode.Parse(source1);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step1\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step1\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -116,8 +117,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right1";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
             // var ti = provider.Provide("http://hl7.org/fhir/StructureDefinition/tutorial-left1");
@@ -165,9 +165,10 @@ namespace Test.FhirMappingLanguage
             var source2 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step2\source\source2.xml");
             var sourceNode = FhirXmlNode.Parse(source2);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step2\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step2\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -182,8 +183,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
@@ -214,9 +214,10 @@ namespace Test.FhirMappingLanguage
             var source3 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\source\source3.xml");
             var sourceNode = FhirXmlNode.Parse(source3);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -231,8 +232,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
@@ -265,9 +265,10 @@ namespace Test.FhirMappingLanguage
             var source3 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\source\source3.xml");
             var sourceNode = FhirXmlNode.Parse(source3);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -282,8 +283,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
@@ -314,9 +314,10 @@ namespace Test.FhirMappingLanguage
             var source3 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\source\source3.xml");
             var sourceNode = FhirXmlNode.Parse(source3);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step3\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -331,8 +332,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
@@ -365,9 +365,10 @@ namespace Test.FhirMappingLanguage
             var source3 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\source\source5.xml");
             var sourceNode = FhirXmlNode.Parse(source3);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -382,8 +383,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right-5";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 
@@ -416,9 +416,10 @@ namespace Test.FhirMappingLanguage
             var source3 = System.IO.File.ReadAllText(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\source\source5b.xml");
             var sourceNode = FhirXmlNode.Parse(source3);
 
-            var source = new CachedResolver(
-               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\logical")
-               );
+            var source = new CachedResolver(new MultiResolver(
+               new DirectorySource(@"E:\git\OpenSource\fhir-mapping-tutorial-master\maptutorial\step5\logical"),
+               ZipSource.CreateValidationSource()
+               ));
             var worker = new TestWorker(source);
 
             IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
@@ -433,8 +434,7 @@ namespace Test.FhirMappingLanguage
                             canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right-5";
                             return true;
                     }
-                    canonical = null;
-                    return false;
+                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
                 });
             var engine = new StructureMapUtilitiesExecute(worker, null, provider);
 

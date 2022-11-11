@@ -224,6 +224,19 @@ namespace Hl7.Fhir.MappingLanguage
             return target;
         }
 
+        public string GetSourceInputStructure(StructureMap sm)
+        {
+            GroupComponent g = sm.Group.First();
+            var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Source);
+            var s = sm.Structure.FirstOrDefault(s => s.Mode == StructureMapModelMode.Source && s.Alias == gt.Type);
+            if (s != null)
+            {
+                // narrow this list down to the type
+                return s.Url;
+            }
+            return null;
+        }
+
         private void log(string category, string message)
         {
             if (services != null)
@@ -248,15 +261,20 @@ namespace Hl7.Fhir.MappingLanguage
          */
         protected void getChildrenByName(ITypedElement item, string name, List<ITypedElement> result)
         {
-            if (ModelInfo.IsPrimitive(item.InstanceType) && name == "value")
+            if (Property.isPrimitive(item.InstanceType) && name == "value")
             {
-                result.Add(ElementNode.ForPrimitive(item.Value));
+                if (item.Value != null)
+                    result.Add(ElementNode.ForPrimitive(item.Value));
+                else
+                    log("info", $"{item.Location}.{name} value was null - not setting");
                 return;
             }
             foreach (ITypedElement v in item.Children(name))
             {
                 if (v != null)
+                {
                     result.Add(v);
+                }
             }
         }
 
@@ -577,6 +595,11 @@ namespace Hl7.Fhir.MappingLanguage
                     StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
                     if (sd != null)
                         statedType = sd.Type;
+                    else
+                    {
+                        // failed to find the type
+                        log("error", $"Failed to find {imp.Url}");
+                    }
                     break;
                 }
             }
@@ -1082,7 +1105,7 @@ namespace Hl7.Fhir.MappingLanguage
             ITypedElement b = getParam(vars, parameter);
             if (b == null)
                 throw new FHIRException("Unable to find a value for " + parameter.Value.ToString() + ". Context: " + message);
-            if (ModelInfo.IsPrimitive(b.InstanceType))
+            if (Property.isPrimitive(b.InstanceType))
                 return b.Value?.ToString();
             throw new FHIRException("Found a value for " + parameter.ToString() + ", but it has a type of " + b.InstanceType + " and cannot be treated as a string. Context: " + message);
         }
@@ -1090,7 +1113,7 @@ namespace Hl7.Fhir.MappingLanguage
         private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
         {
             ITypedElement b = getParam(vars, parameter);
-            if (ModelInfo.IsPrimitive(b.InstanceType))
+            if (Property.isPrimitive(b.InstanceType))
                 return b.Value?.ToString();
             return null;
         }
@@ -1135,7 +1158,7 @@ namespace Hl7.Fhir.MappingLanguage
         public ITypedElement translate(TransformContext context, StructureMap map, ITypedElement source, string conceptMapUrl, string fieldToReturn)
         {
             Coding src = new Coding();
-            if (ModelInfo.IsPrimitive(source.InstanceType))
+            if (Property.isPrimitive(source.InstanceType))
             {
                 src.Code = source.Value.ToString();
             }

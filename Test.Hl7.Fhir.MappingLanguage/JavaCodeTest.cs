@@ -28,9 +28,9 @@ namespace Test.FhirMappingLanguage
 
             var result2 = parser.parse(canonicalFml, null);
 
-            Assert.IsTrue(sm.IsExactly(result2));
             assertSerializeDeserialize(sm);
             assertSerializeDeserialize(result2);
+            Assert.IsTrue(sm.IsExactly(result2));
         }
 
         private void assertSerializeDeserialize(StructureMap structureMap)
