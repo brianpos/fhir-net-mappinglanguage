@@ -663,10 +663,12 @@ namespace Hl7.Fhir.MappingLanguage
             //}
             if (lexer.getCurrent() == "true")
             {
+                lexer.take();
                 return new FhirBoolean(true);
             }
             if (lexer.getCurrent() == "false")
             {
+                lexer.take();
                 return new FhirBoolean(false);
             }
             if (lexer.getCurrent().Equals("{}"))
