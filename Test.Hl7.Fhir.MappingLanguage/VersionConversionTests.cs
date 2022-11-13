@@ -1,3 +1,4 @@
+using Firely.Fhir.Packages;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
@@ -8,7 +9,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Test.Hl7.Fhir.MappingLanguage;
+using Task = System.Threading.Tasks.Task;
 
 namespace Test.FhirMappingLanguage
 {
@@ -40,11 +44,25 @@ namespace Test.FhirMappingLanguage
         IResourceResolver _sourceR4;
 
         [TestMethod]
-        public void PrepareStu3CoreStructureDefinitions()
+        public async Task PrepareStu3CoreStructureDefinitions()
         {
             // Instead of modifying the content, have different directory providers
-            DirectorySource stu3 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r3.core#3.0.2\package");
-            DirectorySource r4 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r4b.core#4.3.0\package");
+            var v3 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.core", "3.0.2");
+            var v4 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r4b.core", "4.3.0");
+            var pc = Firely.Fhir.Packages.PackageClient.Create();
+            var cache = new Firely.Fhir.Packages.DiskPackageCache();
+            if (!await cache.IsInstalled(v3))
+            {
+                var pkg = await pc.GetPackage(v3);
+                await cache.Install(v3, pkg);
+            }
+            if (!await cache.IsInstalled(v4))
+            {
+                var pkg = await pc.GetPackage(v4);
+                await cache.Install(v4, pkg);
+            }
+            DirectorySource stu3 = new DirectorySource(cache.PackageContentFolder(v3));
+            DirectorySource r4 = new DirectorySource(cache.PackageContentFolder(v4));
         }
 
         [TestMethod]
@@ -311,7 +329,7 @@ namespace Test.FhirMappingLanguage
         }
 
         [TestMethod]
-        public async System.Threading.Tasks.Task ConvertAllExamplesR4ToR3()
+        public void ConvertAllExamplesR4ToR3()
         {
             string mapFolder = @"E:\git\HL7\interversion\r4\R4toR3";
             string R4Folder = @"c:\temp\r4-converted";
@@ -387,7 +405,7 @@ namespace Test.FhirMappingLanguage
         }
 
         [TestMethod]
-        public async System.Threading.Tasks.Task ConvertAllExamplesR3ToR4b()
+        public void ConvertAllExamplesR3ToR4b()
         {
             string mapFolder = @"E:\git\HL7\interversion\r4\R3toR4";
             string R3Folder = @"c:\temp\r3-converted";
