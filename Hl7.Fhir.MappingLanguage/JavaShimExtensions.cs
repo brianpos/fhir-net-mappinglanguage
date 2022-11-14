@@ -505,6 +505,13 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
+                if (value.Name == "@primitivevalue@")
+                {
+                    // this is a primitive element
+                    Log("prop", $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType})");
+                    en.Value = value.Value;
+                    return en;
+                }
                 // clone the element in (CodeableConcept child values)
                 var ne = ElementNode.FromElement(value, true);
                 if (me.Definition != null)
