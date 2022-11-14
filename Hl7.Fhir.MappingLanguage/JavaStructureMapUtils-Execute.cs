@@ -822,7 +822,7 @@ namespace Hl7.Fhir.MappingLanguage
                 foreach (ITypedElement item in items)
                     b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
                 if (b.Length() > 0)
-                    services.log("info", b.ToString());
+                    log("info", b.ToString());
             }
 
             if (src.ListMode.HasValue && items.Any())
