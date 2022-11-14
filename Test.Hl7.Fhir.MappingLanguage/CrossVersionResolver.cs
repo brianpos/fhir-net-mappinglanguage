@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Resources;
 using System.Text;
@@ -137,10 +138,19 @@ namespace Test.Hl7.Fhir.MappingLanguage
             var settingsXml = new FhirXmlParsingSettings() { PermissiveParsing = true };
             var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml };
 
-            stu3 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r3.core#3.0.2\package", settingsDir);
-            stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
-            r4 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r4b.core#4.3.0\package", settingsDir);
-            r5 = new DirectorySource(@"C:\Users\brian\.fhir\packages\hl7.fhir.r5.core#5.0.0-ballot\package", settingsDir);
+            string crossVersionPackages = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FhirMapper");
+            if (!System.IO.Directory.Exists(crossVersionPackages))
+            {
+                System.Diagnostics.Trace.WriteLine($"Cross Version package cache folder does not exist {crossVersionPackages}");
+            }
+
+            stu3 = new DirectorySource(Path.Combine(crossVersionPackages, "r3"), settingsDir);
+            // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
+            // r4 = new DirectorySource(Path.Combine(crossVersionPackages, "r4"), settingsDir);
+            r4 = ZipSource.CreateValidationSource();
+            r5 = new DirectorySource(Path.Combine(crossVersionPackages, "r5"), settingsDir);
         }
 
         public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }
@@ -153,9 +163,9 @@ namespace Test.Hl7.Fhir.MappingLanguage
             // System.Diagnostics.Trace.WriteLine(args.Message);
         }
 
-        DirectorySource stu3;
-        DirectorySource r4;
-        DirectorySource r5;
+        IResourceResolver stu3;
+        IResourceResolver r4;
+        IResourceResolver r5;
         const string fhirBaseCanonical = "http://hl7.org/fhir/";
 
         public static string ConvertCanonical(string uri)

@@ -19,6 +19,19 @@ This library provides:
 * Serializer to output a FML representation of a StructureMap POCO object
 * Evaluation of FML transforms
 
+## Running the unit tests locally
+There are a few minor tricks to get the unit tests running locally as they depend on some other github
+projects for the source content, specifically:
+* https://github.com/FHIR/interversion.git
+* https://github.com/HL7/fhir-sdoh-clinicalcare.git
+
+Once you have these projects locally, update the path of these in the unit test classes
+
+> **Note:** The unit test `PrepareStu3CoreStructureDefinitions` should be run to download the cross version
+> npm packages from http://fhir.org/packages/xver-packages.zip
+
+And not all unit tests actually have any assertions, some are done for debugging purposed and require manual
+checks of the output trace. (These will be fixed as the project matures)
 
 ## Getting Started ##
 Coming soon

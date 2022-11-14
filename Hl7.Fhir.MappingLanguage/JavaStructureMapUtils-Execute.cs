@@ -783,7 +783,7 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
                     {
-                        log("debug", indent + "  condition [" + src.Condition + "] for " + item.ToString() + " : false");
+                        log("debug", indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false");
                         remove.Add(item);
                     }
                     else

@@ -1,4 +1,3 @@
-using Firely.Fhir.Packages;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
@@ -6,11 +5,12 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Test.Hl7.Fhir.MappingLanguage;
 using Task = System.Threading.Tasks.Task;
 
@@ -21,6 +21,7 @@ namespace Test.FhirMappingLanguage
     {
         // From github https://github.com/FHIR/interversion.git
         const string mappinginterversion_folder = @"c:\git\HL7\interversion";
+        // const string mappinginterversion_folder = @"e:\git\HL7\interversion";
 
         public VersionConversionTests()
         {
@@ -49,6 +50,63 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public async Task PrepareStu3CoreStructureDefinitions()
         {
+            // Download the cross version packages zip file
+            // http://fhir.org/packages/xver-packages.zip
+            string crossVersionPackages = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FhirMapper");
+            if (!Directory.Exists(crossVersionPackages))
+                Directory.CreateDirectory(crossVersionPackages);
+
+            string crossVersionPackagesZipFile = Path.Combine(crossVersionPackages, "xver-packages.zip");
+
+            if (!File.Exists(crossVersionPackagesZipFile))
+            {
+                HttpClient server = new HttpClient();
+                var stream = await server.GetStreamAsync("http://fhir.org/packages/xver-packages.zip");
+                using (var outStream = File.OpenWrite(crossVersionPackagesZipFile))
+                {
+                    await stream.CopyToAsync(outStream);
+                    await outStream.FlushAsync();
+                }
+            }
+            
+            using (var zipStream = File.OpenRead(crossVersionPackagesZipFile))
+            {
+                ZipArchive archive = new ZipArchive(zipStream);
+                foreach (var item in archive.Entries)
+                {
+                    if (item.Name.EndsWith(".as.r4b.tgz") && !item.Name.StartsWith("."))
+                    {
+                        System.Diagnostics.Trace.WriteLine($"{item.Name}");
+                        var path = Path.Combine(
+                            crossVersionPackages,
+                            item.Name.Split('.').Skip(2).First());
+                        if (!Directory.Exists(path))
+                            Directory.CreateDirectory(path);
+
+                        // Now extract this package into this folder
+                        using (var tarStream = new GZipStream(item.Open(), CompressionMode.Decompress))
+                        {
+                            TarReader r = new TarReader(tarStream);
+                            var a = await r.GetNextEntryAsync();
+                            while (a != null)
+                            {
+                                if (!a.Name.StartsWith("package/other/")
+                                    && !a.Name.StartsWith("package/openapi/")
+                                    && !a.Name.StartsWith("package/xml/")
+                                    && a.Name != "package/.index.json")
+                                {
+                                    // System.Diagnostics.Trace.WriteLine($"{a.Name}");
+                                    await a.ExtractToFileAsync(Path.Combine(path, a.Name.Replace("package/", "")), true);
+                                }
+                                a = await r.GetNextEntryAsync();
+                            }
+                        }
+                    }
+                }
+            }
+
             // Instead of modifying the content, have different directory providers
             var v3 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.core", "3.0.2");
             var v4 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r4b.core", "4.3.0");
@@ -71,66 +129,42 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void AnalyzeStructureR3ToR4Map()
         {
-            var expression = System.IO.File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\StructureMap.map");
+            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\StructureMap.map");
             var worker = new TestWorker(_source);
             var parser = new StructureMapUtilitiesParse();
-            var sm = parser.parse(expression, null);
+            var sm = parser.parse(mapText, null);
 
             var analyzer = new StructureMapUtilitiesAnalyze(worker);
             var analysisResult = analyzer.analyse(null, sm);
         }
 
         [TestMethod]
-        public void ExecuteStructureR3ToR4Map()
+        public void ExecuteStructureR3ToR4Map_Observation()
         {
-            var expression = System.IO.File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\Observation.map");
-            var source3 = System.IO.File.ReadAllText(@"c:\temp\observation-example.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
+            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\Observation.map");
+            var sourceText = File.ReadAllText(@"TestData\observation-example.xml");
+            var sourceNode = FhirXmlNode.Parse(sourceText);
             var worker = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R3toR4");
             var parser = new StructureMapUtilitiesParse();
-            var sm = parser.parse(expression, null);
+            var sm = parser.parse(mapText, null);
 
-            IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(
-                _source,
-                (string name, out string canonical) =>
-                {
-                    // first assume it's a FHIR resource type and use that core content
-                    if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
-                    {
-                        canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
-                        return true;
-                    }
-                    canonical = null;
-                    return false;
-                });
-
-            IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(
-                _source,
-                (string name, out string canonical) =>
-                {
-                    // first assume it's a FHIR resource type and use that core content
-                    if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
-                    {
-                        canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
-                        return true;
-                    }
-                    canonical = null;
-                    return false;
-                });
+            IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(_sourceR3);
+            IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR4);
 
             var engine = new StructureMapUtilitiesExecute(worker, null, providerTarget);
+            var source = engine.GetSourceInput(sm, sourceNode, providerSource);
             var target = engine.GenerateEmptyTargetOutputStructure(sm);
 
             try
             {
-                engine.transform(null, sourceNode.ToTypedElement(providerSource), sm, target);
+                engine.transform(null, source, sm, target);
 
                 // Just perform a loop and transform it repeatedly!
-                for (int n = 0; n < 2000; n++)
-                {
-                    target = engine.GenerateEmptyTargetOutputStructure(sm);
-                    engine.transform(null, sourceNode.ToTypedElement(providerSource), sm, target);
-                }
+                //for (int n = 0; n < 1000; n++)
+                //{
+                //    target = engine.GenerateEmptyTargetOutputStructure(sm);
+                //    engine.transform(null, source, sm, target);
+                //}
             }
             catch (System.Exception ex)
             {
@@ -140,6 +174,10 @@ namespace Test.FhirMappingLanguage
             // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
             System.Diagnostics.Trace.WriteLine(xml2);
 
+            // Add in some assertions for things that break
+            var obs = target.ToPoco<Observation>();
+            Assert.AreEqual("http://terminology.hl7.org/CodeSystem/observation-category", obs.Category[0].Coding[0].System);
+            Assert.AreEqual(4, obs.Code.Coding.Count);
         }
 
         [TestMethod]
@@ -149,15 +187,14 @@ namespace Test.FhirMappingLanguage
             var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
             var worker = new TestWorker(_source);
             var analyzer = new StructureMapUtilitiesAnalyze(worker);
-            foreach (var filename in System.IO.Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", System.IO.SearchOption.AllDirectories))
+            foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", SearchOption.AllDirectories))
             {
                 System.Diagnostics.Trace.WriteLine("-----------------------");
                 System.Diagnostics.Trace.WriteLine(filename);
-                var expression = System.IO.File.ReadAllText(filename);
+                var mapText = File.ReadAllText(filename);
                 try
                 {
-                    var sm = parser.parse(expression, null);
-
+                    var sm = parser.parse(mapText, null);
                     var xml = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(sm);
                     // System.Diagnostics.Trace.WriteLine(xml);
 
@@ -181,15 +218,14 @@ namespace Test.FhirMappingLanguage
         {
             var parser = new StructureMapUtilitiesParse();
             var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
-            foreach (var filename in System.IO.Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", System.IO.SearchOption.AllDirectories))
+            foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", SearchOption.AllDirectories))
             {
                 System.Diagnostics.Trace.WriteLine("-----------------------");
                 System.Diagnostics.Trace.WriteLine(filename);
-                var expression = System.IO.File.ReadAllText(filename);
+                var mapText = File.ReadAllText(filename);
                 try
                 {
-                    var sm = parser.parse(expression, null);
-
+                    var sm = parser.parse(mapText, null);
                     var xml = xs.SerializeToString(sm);
                     // System.Diagnostics.Trace.WriteLine(xml);
 
@@ -211,9 +247,9 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void RoundTripStructureR3toR4Map()
         {
-            var expression = System.IO.File.ReadAllText($"{mappinginterversion_folder}\\r4\\R3toR4\\StructureMap.map");
+            var mapText = File.ReadAllText($"{mappinginterversion_folder}\\r4\\R3toR4\\StructureMap.map");
             var parser = new StructureMapUtilitiesParse();
-            var sm = parser.parse(expression, null);
+            var sm = parser.parse(mapText, null);
 
             var xml = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(sm);
             System.Diagnostics.Trace.WriteLine(xml);
@@ -224,8 +260,8 @@ namespace Test.FhirMappingLanguage
             var result2 = parser.parse(canonicalFml, null);
             var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(result2);
 
-            System.IO.File.WriteAllText(@"c:\temp\sm1.xml", xml);
-            System.IO.File.WriteAllText(@"c:\temp\sm2.xml", xml2);
+            File.WriteAllText(@"c:\temp\sm1.xml", xml);
+            File.WriteAllText(@"c:\temp\sm2.xml", xml2);
 
             // Assert.AreEqual(xml, xml2);
             Assert.IsTrue(sm.IsExactly(result2));
@@ -240,14 +276,14 @@ namespace Test.FhirMappingLanguage
             string outputR4Folder = @"c:\temp\r4-converted";
             string outputR3Folder = @"c:\temp\r3-converted";
             string outputR3FolderB = @"c:\temp\r3-original";
-            if (!System.IO.Directory.Exists(outputR3Folder))
-                System.IO.Directory.CreateDirectory(outputR3Folder);
-            if (!System.IO.Directory.Exists(outputR3FolderB))
-                System.IO.Directory.CreateDirectory(outputR3FolderB);
-            if (!System.IO.Directory.Exists(outputR4Folder))
-                System.IO.Directory.CreateDirectory(outputR4Folder);
+            if (!Directory.Exists(outputR3Folder))
+                Directory.CreateDirectory(outputR3Folder);
+            if (!Directory.Exists(outputR3FolderB))
+                Directory.CreateDirectory(outputR3FolderB);
+            if (!Directory.Exists(outputR4Folder))
+                Directory.CreateDirectory(outputR4Folder);
 
-            if (!System.IO.File.Exists(examplesFile))
+            if (!File.Exists(examplesFile))
             {
                 HttpClient server = new HttpClient();
                 var stream = await server.GetStreamAsync("https://www.hl7.org/fhir/STU3/examples-json.zip");
@@ -284,27 +320,25 @@ namespace Test.FhirMappingLanguage
                     using (var sr = new StreamReader(stream))
                     {
                         ISourceNode sourceNode;
-                        var source3 = sr.ReadToEnd();
+                        var sourceText = sr.ReadToEnd();
                         if (file.Name.EndsWith(".json"))
-                            sourceNode = FhirJsonNode.Parse(source3);
+                            sourceNode = FhirJsonNode.Parse(sourceText);
                         else
-                            sourceNode = FhirXmlNode.Parse(source3);
+                            sourceNode = FhirXmlNode.Parse(sourceText);
 
                         try
                         {
-                            if (!System.IO.File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
 
-                            var expression = System.IO.File.ReadAllText($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map");
-                            var sm = parser.parse(expression, null);
+                            var mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map");
+                            var sm = parser.parse(mapText, null);
 
                             var target = engine.GenerateEmptyTargetOutputStructure(sm);
-                            var sourceUrl = engine.GetSourceInputStructure(sm);
-                            var source = sourceNode.ToTypedElement(providerSource, sourceUrl);
-                            // var sd = _source.ResolveByCanonicalUri(sourceUrl) as StructureDefinition;
+                            var source = engine.GetSourceInput(sm, sourceNode, providerSource);
 
                             // dump the original format of the file (for comparison later)
                             File.WriteAllText(Path.Combine(outputR3FolderB, $"{file.Name.Replace("json", "xml")}"), source.ToXml(xmlSettings));
@@ -313,7 +347,7 @@ namespace Test.FhirMappingLanguage
 
                             var xml2 = target.ToXml(xmlSettings);
                             // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-                            System.IO.File.WriteAllText(Path.Combine(outputR4Folder, $"{file.Name.Replace("json", "xml")}"), xml2);
+                            File.WriteAllText(Path.Combine(outputR4Folder, $"{file.Name.Replace("json", "xml")}"), xml2);
                             // System.Diagnostics.Trace.WriteLine(xml2);
                             resourceConverted++;
                         }
@@ -337,10 +371,10 @@ namespace Test.FhirMappingLanguage
             string mapFolder = @$"{mappinginterversion_folder}\r4\R4toR3";
             string R4Folder = @"c:\temp\r4-converted";
             string R3Folder = @"c:\temp\r3-converted";
-            if (!System.IO.Directory.Exists(R3Folder))
-                System.IO.Directory.CreateDirectory(R3Folder);
-            if (!System.IO.Directory.Exists(R4Folder))
-                System.IO.Directory.CreateDirectory(R4Folder);
+            if (!Directory.Exists(R3Folder))
+                Directory.CreateDirectory(R3Folder);
+            if (!Directory.Exists(R4Folder))
+                Directory.CreateDirectory(R4Folder);
 
             // mapper engine parts
             var workerR4toR3 = new TestWorker(_source, mapFolder);
@@ -366,30 +400,29 @@ namespace Test.FhirMappingLanguage
                     using (var sr = new StreamReader(stream))
                     {
                         ISourceNode sourceNode;
-                        var source = sr.ReadToEnd();
+                        var sourceText = sr.ReadToEnd();
                         if (file.Name.EndsWith(".json"))
-                            sourceNode = FhirJsonNode.Parse(source);
+                            sourceNode = FhirJsonNode.Parse(sourceText);
                         else
-                            sourceNode = FhirXmlNode.Parse(source);
+                            sourceNode = FhirXmlNode.Parse(sourceText);
 
                         try
                         {
-                            if (!System.IO.File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
-                            var expression = System.IO.File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
-                            var sm = parser.parse(expression, null);
+                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
+                            var sm = parser.parse(mapText, null);
 
                             var target = engine.GenerateEmptyTargetOutputStructure(sm);
-                            var sourceUrl = engine.GetSourceInputStructure(sm);
-
-                            engine.transform(null, sourceNode.ToTypedElement(providerSource, sourceUrl), sm, target);
+                            var source = engine.GetSourceInput(sm, sourceNode, providerSource);
+                            engine.transform(null, source, sm, target);
 
                             var xml = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
                             // var xml = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-                            System.IO.File.WriteAllText(Path.Combine(R3Folder, $"{file.Name.Replace("json", "xml")}"), xml);
+                            File.WriteAllText(Path.Combine(R3Folder, $"{file.Name.Replace("json", "xml")}"), xml);
                             // System.Diagnostics.Trace.WriteLine(xml2);
                             resourceConverted++;
                         }
@@ -413,10 +446,10 @@ namespace Test.FhirMappingLanguage
             string mapFolder = @$"{mappinginterversion_folder}\r4\R3toR4";
             string R3Folder = @"c:\temp\r3-converted";
             string R4Folder = @"c:\temp\r4-converted2";
-            if (!System.IO.Directory.Exists(R3Folder))
-                System.IO.Directory.CreateDirectory(R3Folder);
-            if (!System.IO.Directory.Exists(R4Folder))
-                System.IO.Directory.CreateDirectory(R4Folder);
+            if (!Directory.Exists(R3Folder))
+                Directory.CreateDirectory(R3Folder);
+            if (!Directory.Exists(R4Folder))
+                Directory.CreateDirectory(R4Folder);
 
             // mapper engine parts
             var worker = new TestWorker(_source, mapFolder);
@@ -442,30 +475,29 @@ namespace Test.FhirMappingLanguage
                     using (var sr = new StreamReader(stream))
                     {
                         ISourceNode sourceNode;
-                        var source = sr.ReadToEnd();
+                        var sourceText = sr.ReadToEnd();
                         if (file.Name.EndsWith(".json"))
-                            sourceNode = FhirJsonNode.Parse(source);
+                            sourceNode = FhirJsonNode.Parse(sourceText);
                         else
-                            sourceNode = FhirXmlNode.Parse(source);
+                            sourceNode = FhirXmlNode.Parse(sourceText);
 
                         try
                         {
-                            if (!System.IO.File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
-                            var expression = System.IO.File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
-                            var sm = parser.parse(expression, null);
+                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
+                            var sm = parser.parse(mapText, null);
 
                             var target = engine.GenerateEmptyTargetOutputStructure(sm);
-                            var sourceUrl = engine.GetSourceInputStructure(sm);
-
-                            engine.transform(null, sourceNode.ToTypedElement(providerSource, sourceUrl), sm, target);
+                            var source = engine.GetSourceInput(sm, sourceNode, providerSource);
+                            engine.transform(null, source, sm, target);
 
                             var xml = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
                             // var xml = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-                            System.IO.File.WriteAllText(Path.Combine(R4Folder, $"{file.Name.Replace("json", "xml")}"), xml);
+                            File.WriteAllText(Path.Combine(R4Folder, $"{file.Name.Replace("json", "xml")}"), xml);
                             // System.Diagnostics.Trace.WriteLine(xml2);
                             resourceConverted++;
                         }
