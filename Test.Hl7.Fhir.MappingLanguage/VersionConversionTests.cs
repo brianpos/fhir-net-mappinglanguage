@@ -46,6 +46,8 @@ namespace Test.FhirMappingLanguage
         IResourceResolver _source;
         IResourceResolver _sourceR3;
         IResourceResolver _sourceR4;
+        FhirXmlSerializationSettings _xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
+        FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
 
         [TestMethod]
         public async Task PrepareStu3CoreStructureDefinitions()
@@ -170,7 +172,7 @@ namespace Test.FhirMappingLanguage
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
             }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
+            var xml2 = target.ToXml(_xmlSettings);
             // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
             System.Diagnostics.Trace.WriteLine(xml2);
 
@@ -420,7 +422,7 @@ namespace Test.FhirMappingLanguage
                             var source = engine.GetSourceInput(sm, sourceNode, providerSource);
                             engine.transform(null, source, sm, target);
 
-                            var xml = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
+                            var xml = target.ToXml(_xmlSettings);
                             // var xml = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
                             File.WriteAllText(Path.Combine(R3Folder, $"{file.Name.Replace("json", "xml")}"), xml);
                             // System.Diagnostics.Trace.WriteLine(xml2);
@@ -495,7 +497,7 @@ namespace Test.FhirMappingLanguage
                             var source = engine.GetSourceInput(sm, sourceNode, providerSource);
                             engine.transform(null, source, sm, target);
 
-                            var xml = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
+                            var xml = target.ToXml(_xmlSettings);
                             // var xml = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
                             File.WriteAllText(Path.Combine(R4Folder, $"{file.Name.Replace("json", "xml")}"), xml);
                             // System.Diagnostics.Trace.WriteLine(xml2);
