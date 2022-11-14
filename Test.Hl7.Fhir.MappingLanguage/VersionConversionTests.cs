@@ -4,6 +4,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
+using Hl7.Fhir.Validation;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Formats.Tar;
@@ -275,16 +276,6 @@ namespace Test.FhirMappingLanguage
             // Download the examples zip file
             // https://www.hl7.org/fhir/STU3/examples-json.zip
             string examplesFile = @"c:\temp\examples-json.zip";
-            string outputR4Folder = @"c:\temp\r4-converted";
-            string outputR3Folder = @"c:\temp\r3-converted";
-            string outputR3FolderB = @"c:\temp\r3-original";
-            if (!Directory.Exists(outputR3Folder))
-                Directory.CreateDirectory(outputR3Folder);
-            if (!Directory.Exists(outputR3FolderB))
-                Directory.CreateDirectory(outputR3FolderB);
-            if (!Directory.Exists(outputR4Folder))
-                Directory.CreateDirectory(outputR4Folder);
-
             if (!File.Exists(examplesFile))
             {
                 HttpClient server = new HttpClient();
@@ -296,28 +287,31 @@ namespace Test.FhirMappingLanguage
 
             // mapper engine parts
             var workerR3toR4 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R3toR4");
+            var workerR4toR3 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R4toR3");
             var parser = new StructureMapUtilitiesParse();
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(_source);
-            IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(_sourceR3);
-            var engine = new StructureMapUtilitiesExecute(workerR3toR4, null, provider);
-            var xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
+            IStructureDefinitionSummaryProvider providerR4 = new StructureDefinitionSummaryProvider(_sourceR4);
+            IStructureDefinitionSummaryProvider providerR3 = new StructureDefinitionSummaryProvider(_sourceR3);
+            var engine3to4 = new StructureMapUtilitiesExecute(workerR3toR4, null, providerR4);
+            var engine4to3 = new StructureMapUtilitiesExecute(workerR4toR3, null, providerR3);
+
+            var validator = new Validator(new ValidationSettings() { ResourceResolver = _source });
 
             // scan all the files in the zip
             var inputPath = ZipFile.OpenRead(examplesFile);
             var files = inputPath.Entries;
             int resourceErrors = 0;
+            int validationErrors = 0;
             int resourceConverted = 0;
+            int resourceConvertedBack = 0;
+            int identicalXml = 0;
+            int identicalJson = 0;
             foreach (var file in files)
             {
                 // skip to the test file we want to check
                 //if (file.Name != "capabilitystatement-capabilitystatement-base(base).json")
                 //    continue;
-
                 System.Diagnostics.Trace.WriteLine($"{file.Name}");
-                var stream = file.Open();
-                //if (file.Length > 10000)
-                //    continue;
-                using (stream)
+                using (var stream = file.Open())
                 {
                     using (var sr = new StreamReader(stream))
                     {
@@ -330,6 +324,7 @@ namespace Test.FhirMappingLanguage
 
                         try
                         {
+                            // Convert up to R4
                             if (!File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
@@ -338,20 +333,46 @@ namespace Test.FhirMappingLanguage
 
                             var mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map");
                             var sm = parser.parse(mapText, null);
+                            var source = engine3to4.GetSourceInput(sm, sourceNode, providerR3);
+                            var target = engine3to4.GenerateEmptyTargetOutputStructure(sm);
+                            engine3to4.transform(null, source, sm, target);
 
-                            var target = engine.GenerateEmptyTargetOutputStructure(sm);
-                            var source = engine.GetSourceInput(sm, sourceNode, providerSource);
+                            var xmlR4 = target.ToXml(_xmlSettings);
+                            var jsonR4 = target.ToJson(_jsonSettings);
 
-                            // dump the original format of the file (for comparison later)
-                            File.WriteAllText(Path.Combine(outputR3FolderB, $"{file.Name.Replace("json", "xml")}"), source.ToXml(xmlSettings));
-
-                            engine.transform(null, source, sm, target);
-
-                            var xml2 = target.ToXml(xmlSettings);
-                            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-                            File.WriteAllText(Path.Combine(outputR4Folder, $"{file.Name.Replace("json", "xml")}"), xml2);
-                            // System.Diagnostics.Trace.WriteLine(xml2);
+                            // Validate this content as R4
+                            // var poco = target.ToPoco<Resource>(new PocoBuilderSettings() { AllowUnrecognizedEnums = true });
+                            var output = validator.Validate(target);
+                            if (!output.Success)
+                            {
+                                validationErrors++;
+                                System.Diagnostics.Trace.WriteLine(output.ToXml(_xmlSettings));
+                            }
                             resourceConverted++;
+
+                            // Convert back down to STU3
+                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R4toR3\{target.Name}.map"))
+                            {
+                                System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({target.Name}) that has no backward map");
+                                continue;
+                            }
+                            mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R4toR3\{sourceNode.Name}.map");
+                            sm = parser.parse(mapText, null);
+                            var targetR3 = engine4to3.GenerateEmptyTargetOutputStructure(sm);
+                            engine4to3.transform(null, target, sm, targetR3);
+
+                            resourceConvertedBack++;
+
+                            // and compare the results!
+                            var sourceXmlR3 = source.ToXml(_xmlSettings);
+                            var sourceJsonR3 = source.ToJson(_jsonSettings);
+                            var targetXmlR3 = targetR3.ToXml(_xmlSettings);
+                            var targetJsonR3 = targetR3.ToJson(_jsonSettings);
+
+                            if (sourceXmlR3 == targetXmlR3)
+                                identicalXml++;
+                            if (sourceJsonR3 == targetJsonR3)
+                                identicalJson++;
                         }
                         catch (System.Exception ex)
                         {
@@ -362,8 +383,12 @@ namespace Test.FhirMappingLanguage
                 }
             }
             System.Diagnostics.Trace.WriteLine($"Processed: {files.Count}");
-            System.Diagnostics.Trace.WriteLine($"Complete: {resourceConverted}");
-            System.Diagnostics.Trace.WriteLine($"Errors: {resourceErrors}");
+            System.Diagnostics.Trace.WriteLine($"Complete:  {resourceConverted}");
+            System.Diagnostics.Trace.WriteLine($"And back:  {resourceConvertedBack}");
+            System.Diagnostics.Trace.WriteLine($"Same xml:  {identicalXml}");
+            System.Diagnostics.Trace.WriteLine($"Same json: {identicalJson}");
+            System.Diagnostics.Trace.WriteLine($"Validation:{validationErrors}");
+            System.Diagnostics.Trace.WriteLine($"Exceptions:{resourceErrors}");
             Assert.AreEqual(0, resourceErrors);
         }
 
