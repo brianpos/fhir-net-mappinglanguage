@@ -272,9 +272,22 @@ namespace Test.FhirMappingLanguage
             Assert.IsTrue(sm.IsExactly(result2));
         }
 
+        class ResourceTestResult
+        {
+            public int resourceErrors = 0;
+            public int validationErrors = 0;
+            public int resourceConverted = 0;
+            public int resourceConvertedBack = 0;
+            public int identicalXml = 0;
+            public int identicalJson = 0;
+        }
+
         [TestMethod]
         public async System.Threading.Tasks.Task ConvertAllStu3ExamplesToR4FromZip()
         {
+            // This test will end up producing an error report like the one at https://www.hl7.org/fhir/r3maps.html
+            Dictionary<string, ResourceTestResult> results = new Dictionary<string, ResourceTestResult>();
+
             // Download the examples zip file
             // https://www.hl7.org/fhir/STU3/examples-json.zip
             string examplesFile = @"c:\temp\examples-json.zip";
@@ -301,12 +314,12 @@ namespace Test.FhirMappingLanguage
             // scan all the files in the zip
             var inputPath = ZipFile.OpenRead(examplesFile);
             var files = inputPath.Entries;
-            int resourceErrors = 0;
-            int validationErrors = 0;
-            int resourceConverted = 0;
-            int resourceConvertedBack = 0;
-            int identicalXml = 0;
-            int identicalJson = 0;
+            //int resourceErrors = 0;
+            //int validationErrors = 0;
+            //int resourceConverted = 0;
+            //int resourceConvertedBack = 0;
+            //int identicalXml = 0;
+            //int identicalJson = 0;
             foreach (var file in files)
             {
                 // skip to the test file we want to check
@@ -323,6 +336,14 @@ namespace Test.FhirMappingLanguage
                             sourceNode = FhirJsonNode.Parse(sourceText);
                         else
                             sourceNode = FhirXmlNode.Parse(sourceText);
+
+                        ResourceTestResult itemResult;
+                        if (!results.ContainsKey(sourceNode.Name))
+                        {
+                            itemResult = new ResourceTestResult();
+                            results.Add(sourceNode.Name, itemResult);
+                        }
+                        itemResult = results[sourceNode.Name];
 
                         try
                         {
@@ -347,10 +368,10 @@ namespace Test.FhirMappingLanguage
                             var output = validator.Validate(target);
                             if (!output.Success)
                             {
-                                validationErrors++;
+                                itemResult.validationErrors++;
                                 System.Diagnostics.Trace.WriteLine(output.ToXml(_xmlSettings));
                             }
-                            resourceConverted++;
+                            itemResult.resourceConverted++;
 
                             // Convert back down to STU3
                             if (!File.Exists($@"{mappinginterversion_folder}\r4\R4toR3\{target.Name}.map"))
@@ -363,7 +384,7 @@ namespace Test.FhirMappingLanguage
                             var targetR3 = engine4to3.GenerateEmptyTargetOutputStructure(sm);
                             engine4to3.transform(null, target, sm, targetR3);
 
-                            resourceConvertedBack++;
+                            itemResult.resourceConvertedBack++;
 
                             // and compare the results!
                             var sourceXmlR3 = source.ToXml(_xmlSettings);
@@ -372,26 +393,33 @@ namespace Test.FhirMappingLanguage
                             var targetJsonR3 = targetR3.ToJson(_jsonSettings);
 
                             if (sourceXmlR3 == targetXmlR3)
-                                identicalXml++;
+                                itemResult.identicalXml++;
                             if (sourceJsonR3 == targetJsonR3)
-                                identicalJson++;
+                                itemResult.identicalJson++;
                         }
                         catch (System.Exception ex)
                         {
                             System.Diagnostics.Trace.WriteLine(ex.Message);
-                            resourceErrors++;
+                            itemResult.resourceErrors++;
                         }
                     }
                 }
             }
             System.Diagnostics.Trace.WriteLine($"Processed: {files.Count}");
-            System.Diagnostics.Trace.WriteLine($"Complete:  {resourceConverted}");
-            System.Diagnostics.Trace.WriteLine($"And back:  {resourceConvertedBack}");
-            System.Diagnostics.Trace.WriteLine($"Same xml:  {identicalXml}");
-            System.Diagnostics.Trace.WriteLine($"Same json: {identicalJson}");
-            System.Diagnostics.Trace.WriteLine($"Validation:{validationErrors}");
-            System.Diagnostics.Trace.WriteLine($"Exceptions:{resourceErrors}");
-            Assert.AreEqual(0, resourceErrors);
+            System.Diagnostics.Trace.WriteLine($"Complete:  {results.Values.Sum(v => v.resourceConverted)}");
+            System.Diagnostics.Trace.WriteLine($"And back:  {results.Values.Sum(v => v.resourceConvertedBack)}");
+            System.Diagnostics.Trace.WriteLine($"Same xml:  {results.Values.Sum(v => v.identicalXml)}");
+            System.Diagnostics.Trace.WriteLine($"Same json: {results.Values.Sum(v => v.identicalJson)}");
+            System.Diagnostics.Trace.WriteLine($"Validation:{results.Values.Sum(v => v.validationErrors)}");
+            System.Diagnostics.Trace.WriteLine($"Exceptions:{results.Values.Sum(v => v.resourceErrors)}");
+
+            // Now output the table!
+            foreach (var r in results)
+            {
+                System.Diagnostics.Trace.WriteLine($"{r.Key}\t{r.Value.resourceConverted}\t{r.Value.identicalXml},{r.Value.identicalJson}\t{(r.Value.resourceConverted-r.Value.validationErrors)/ r.Value.resourceConverted}\t{r.Value.validationErrors}");
+            }
+
+            Assert.AreEqual(0, results.Values.Sum(v => v.resourceErrors));
         }
 
         [TestMethod]
