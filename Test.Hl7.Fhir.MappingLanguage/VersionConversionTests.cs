@@ -181,6 +181,8 @@ namespace Test.FhirMappingLanguage
             var obs = target.ToPoco<Observation>();
             Assert.AreEqual("http://terminology.hl7.org/CodeSystem/observation-category", obs.Category[0].Coding[0].System);
             Assert.AreEqual(4, obs.Code.Coding.Count);
+            Assert.IsTrue(xml2.Contains("<extension url=\"http://example.org/testme\">"));
+            Assert.IsTrue(xml2.Contains("<valueString value=\"test\" />"));
         }
 
         [TestMethod]

@@ -33,7 +33,10 @@
       <display value="Body Weight"/> 
     </coding> 
   </code> 
-  <subject> 
+  <subject>
+    <extension url="http://example.org/testme">
+      <valueString value="test"/>
+    </extension>
     <reference value="Patient/example"/> 
   </subject> 
   <context> 
@@ -49,7 +52,7 @@
     is always preferred, but it doesn't provide notional units (such as
     "tablet"), etc. For these, something else is required (e.g. SNOMED CT)
        -->
-  <valueQuantity> 
+  <valueQuantity>
     <value value="185"/> 
     <unit value="lbs"/> 
     <system value="http://unitsofmeasure.org"/> 
