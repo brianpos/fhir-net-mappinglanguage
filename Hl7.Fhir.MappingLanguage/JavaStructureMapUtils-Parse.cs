@@ -332,7 +332,7 @@ namespace Hl7.Fhir.MappingLanguage
                         for (int i = 0; i < indent + 4; i++)
                             b.Append(' ');
                     }
-                    renderTarget(b, rt, false);
+                    renderTarget(b, rt, canBeAbbreviated);
                 }
             }
             else if (r.Target.Any())
@@ -1212,7 +1212,7 @@ namespace Hl7.Fhir.MappingLanguage
                 // consider if this *should* prefix the expression at this stage with the %
                 ExpressionNode node = fpe.parse(lexer);
                 target.addParameter().Value = new FhirString(node.ToString());
-                if (node.getName() != null && node.getName().StartsWith("%"))
+                if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
                     node.setName("%" + node.getName());
                 target.setUserData(MAP_EXPRESSION, node);
                 lexer.token(")");

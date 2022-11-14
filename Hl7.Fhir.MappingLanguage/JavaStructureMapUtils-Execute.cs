@@ -237,6 +237,13 @@ namespace Hl7.Fhir.MappingLanguage
             return null;
         }
 
+        public ITypedElement GetSourceInput(StructureMap sm, ISourceNode sourceNode, IStructureDefinitionSummaryProvider sourceProvider)
+        {
+            var sourceUrl = GetSourceInputStructure(sm);
+            var sd = sourceProvider.Provide(sourceUrl);
+            return sourceNode.ToTypedElement(sourceProvider, sd.TypeName);
+        }
+
         private void log(string category, string message)
         {
             if (services != null)
