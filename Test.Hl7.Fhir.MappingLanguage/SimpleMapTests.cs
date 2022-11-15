@@ -18,6 +18,50 @@ namespace Test.FhirMappingLanguage
         FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
 
         [TestMethod]
+        public void TransformNarrative()
+        {
+            var mapText = @"
+                map ""http://fhirpath-lab.com/fhir/StructureMap/test-primitives"" = ""TestPrimitives""
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as source
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as target
+                group tutorial(source src : Observation, target tgt : Observation) {
+                    src.text -> tgt.text;
+                    src.id as a -> tgt.id = a;
+                }
+                group Narrative(source src : Narrative, target tgt : Narrative) <<type+>> {
+                  src.status -> tgt.status;
+                  src.div -> tgt.div;
+                }
+                group xhtml(source src : xhtml, target tgt : xhtml) <<type+>> {
+                  src.value as v -> tgt.value = v ""xhtml-value"";
+                }
+                group code(source src : code, target tgt : code) <<type+>> {
+                  src.value as v -> tgt.value = v ""code-value"";
+                }
+                ";
+            var qr = new Observation();
+            qr.Text = new Narrative() { Status = Narrative.NarrativeStatus.Generated, Div = "<div xmlns=\"http://www.w3.org/1999/xhtml\">Observation</div>" };
+            qr.Id = "idval";
+
+            var parser = new StructureMapUtilitiesParse();
+            var sm = parser.parse(mapText, null);
+
+            var worker = TutorialTests.CreateWorker();
+            var provider = new PocoStructureDefinitionSummaryProvider();
+            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+
+            var target = engine.GenerateEmptyTargetOutputStructure(sm);
+            engine.transform(null, qr.ToTypedElement(), sm, target);
+            System.Diagnostics.Trace.WriteLine(target.ToJson(_jsonSettings));
+            var output = target.ToPoco<Observation>();
+            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
+            System.Diagnostics.Trace.WriteLine(xml2);
+            Assert.AreEqual("idval", output.Id);
+            Assert.AreEqual(Narrative.NarrativeStatus.Generated, output.Text.Status);
+            Assert.AreEqual(qr.Text.Div, output.Text.Div);
+        }
+
+        [TestMethod]
         public void TransformStructureMap()
         {
             // https://fhir.dk.swisstph-mis.ch/matchbox/fhir/StructureMap/emcarea.registration.p
