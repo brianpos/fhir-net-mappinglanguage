@@ -70,7 +70,7 @@ namespace Hl7.Fhir.MappingLanguage
         public interface ITransformerServices
         {
             //    public bool validateByValueSet(Coding code, string valuesetId);
-            public void log(string category, string message); // log internal progress
+            public void log(string category, Func<string> message); // log internal progress
             public ITypedElement createType(Object appInfo, string name);
             public ITypedElement createResource(Object appInfo, ITypedElement res, bool atRootofTransform); // an already created resource is provided; this is to identify/store it
             public Coding translate(Object appInfo, Coding source, string conceptMapUrl);
@@ -349,12 +349,12 @@ namespace Hl7.Fhir.MappingLanguage
 
         }
 
-        private void log(string category, string cnt)
+        private void log(string category, Func<string> message)
         {
             if (services != null)
-                services.log(category, cnt);
+                services.log(category, message);
             else
-                System.Diagnostics.Trace.WriteLine($"{category}: {cnt}");
+                System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
         }
 
         /**
@@ -645,7 +645,7 @@ namespace Hl7.Fhir.MappingLanguage
             tr.addTag("td").addTag("b").addText("Source");
             tr.addTag("td").addTag("b").addText("Target");
 
-            log("debug", "Start Profiling Transform " + map.Url);
+            log("debug", () => "Start Profiling Transform " + map.Url);
             analyseGroup("", context, map, vars, start, result);
             ProfileUtilities pu = new ProfileUtilities(worker, null, pkp);
             foreach (StructureDefinition sd in result.getProfiles())
@@ -656,7 +656,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void analyseGroup(string indent, TransformContext context, StructureMap map, VariablesForProfiling vars, StructureMap.GroupComponent group, StructureMapAnalysis result)
         {
-            log("debug", indent + "Analyse Group : " + group.Name);
+            log("debug", () => indent + "Analyse Group : " + group.Name);
             // todo: extends
             // todo: check inputs
             XhtmlNode tr = result.summary.addTag("tr").setAttribute("class", "diff-title");
@@ -685,7 +685,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void analyseRule(string indent, TransformContext context, StructureMap map, VariablesForProfiling vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, StructureMapAnalysis result)
         {
-            log("debug", indent + "Analyse rule : " + rule.Name);
+            log("debug", () => indent + "Analyse rule : " + rule.Name);
             XhtmlNode tr = result.getSummary().addTag("tr");
             XhtmlNode xs = tr.addTag("td");
             XhtmlNode xt = tr.addTag("td");

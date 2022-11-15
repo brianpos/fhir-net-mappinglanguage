@@ -501,14 +501,14 @@ namespace Hl7.Fhir.MappingLanguage
         //    return null;
         //}
 
-        public static ITypedElement setProperty(this ITypedElement me, Action<string, string> Log, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
+        public static ITypedElement setProperty(this ITypedElement me, Action<string, Func<string>> Log, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
         {
             if (me is ElementNode en)
             {
                 if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
                 { 
                     // this is a primitive element
-                    Log("prop", $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive");
+                    Log("prop", () => $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive");
                     en.Value = value.Value;
                     return en;
                 }
@@ -525,25 +525,25 @@ namespace Hl7.Fhir.MappingLanguage
                             // Remove any existing values
                             if (me.Children(name).Any())
                             {
-                                Log("prop", $"Replacing an existing node {name} at {me.Location}");
+                                Log("prop", () => $"Replacing an existing node {name} at {me.Location}");
                                 en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
                                 return ne;
                             }
                         }
                     }
                 }
-                Log("prop", $"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
+                Log("prop", () => $"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
                 return en.Add(pkp, ne, name);
                 // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
             return null;
         }
 
-        public static ITypedElement makeProperty(this ITypedElement me, Action<string, string> Log, IStructureDefinitionSummaryProvider pkp, string name)
+        public static ITypedElement makeProperty(this ITypedElement me, Action<string, Func<string>> Log, IStructureDefinitionSummaryProvider pkp, string name)
         {
             if (me is ElementNode en)
             {
-                Log("prop", $"MakeProp {name} context: {me.Location}");
+                Log("prop", () => $"MakeProp {name} context: {me.Location}");
                 var result = en.Add(pkp, name);
                 return result;
             }

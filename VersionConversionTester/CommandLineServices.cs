@@ -27,7 +27,7 @@ namespace VersionConversionTester
             return ElementNode.Root(_provider, name);
         }
 
-        public void log(string category, string message)
+        public void log(string category, Func<string> message)
         {
             if (category != "error")
                 return;
@@ -46,7 +46,7 @@ namespace VersionConversionTester
                     Console.ForegroundColor = ConsoleColor.White;
                     break;
             }
-            Console.WriteLine($"{category}: {message}");
+            Console.WriteLine($"{category}: {message()}");
             Console.ResetColor();
         }
 

@@ -244,12 +244,12 @@ namespace Hl7.Fhir.MappingLanguage
             return sourceNode.ToTypedElement(sourceProvider, sd.TypeName);
         }
 
-        private void log(string category, string message)
+        private void log(string category, Func<string> message)
         {
             if (services != null)
                 services.log(category, message);
             else
-                System.Diagnostics.Trace.WriteLine($"{category}: {message}");
+                System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
         }
 
         /**
@@ -273,7 +273,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (item.Value != null)
                     result.Add(ElementNode.ForPrimitive(item.Value));
                 else
-                    log("info", $"{item.Location}.{name} value was null - not setting");
+                    log("info", () => $"{item.Location}.{name} value was null - not setting");
                 return;
             }
             foreach (ITypedElement v in item.Children(name))
@@ -289,7 +289,7 @@ namespace Hl7.Fhir.MappingLanguage
         public void transform(Object appInfo, ITypedElement source, StructureMap map, ElementNode target)
         {
             TransformContext context = new TransformContext(appInfo);
-            log("debug", "Start Transform " + map.Url);
+            log("debug", () => "Start Transform " + map.Url);
             StructureMap.GroupComponent g = map.Group.First();
 
             Variables vars = new Variables();
@@ -319,7 +319,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeGroup(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, bool atRoot)
         {
-            log("debug", indent + "Group : " + group.Name + "; vars = " + vars.summary());
+            log("debug", () => indent + "Group : " + group.Name + "; vars = " + vars.summary());
             // todo: check inputs
             if (!string.IsNullOrEmpty(group.Extends))
             {
@@ -335,7 +335,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
-            log("debug", indent + "rule : " + rule.Name + "; vars = " + vars.summary());
+            log("debug", () => indent + "rule : " + rule.Name + "; vars = " + vars.summary());
             Variables srcVars = vars.copy();
             if (rule.Source.Count() != 1)
                 throw new FHIRException("Rule \"" + rule.Name + "\": not handled yet");
@@ -368,7 +368,7 @@ namespace Hl7.Fhir.MappingLanguage
                           && !rule.getTargetFirstRep().Parameter.Any())
                     {
                         // simple inferred, map by type
-                        log("debug", v.summary());
+                        log("debug", () => v.summary());
                         ITypedElement src = v.getInputVar(rule.getSourceFirstRep().Variable);
                         ElementNode tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
                         string srcType = src.InstanceType;
@@ -605,7 +605,7 @@ namespace Hl7.Fhir.MappingLanguage
                     else
                     {
                         // failed to find the type
-                        log("error", $"Failed to find {imp.Url}");
+                        log("error", () => $"Failed to find {imp.Url}");
                     }
                     break;
                 }
@@ -783,11 +783,11 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
                     {
-                        log("debug", indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false");
+                        log("debug", () => indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false");
                         remove.Add(item);
                     }
                     else
-                        log("debug", indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
+                        log("debug", () => indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
                 }
                 items.RemoveAll(r => remove.Contains(r));
             }
@@ -822,7 +822,7 @@ namespace Hl7.Fhir.MappingLanguage
                 foreach (ITypedElement item in items)
                     b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
                 if (b.Length() > 0)
-                    log("info", b.ToString());
+                    log("info", () => b.ToString());
             }
 
             if (src.ListMode.HasValue && items.Any())
@@ -946,7 +946,7 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         if (tgt.hasUserData("profile"))
                             res.setUserData("profile", tgt.getUserData("profile"));
-                        log("debug", $"Create {tn}");
+                        log("debug", () => $"Create {tn}");
                         return res;
 
                     case StructureMap.StructureMapTransform.Copy:

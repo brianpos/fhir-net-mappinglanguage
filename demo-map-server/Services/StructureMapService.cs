@@ -299,9 +299,9 @@ namespace demo_map_server.Services
                 return ElementNode.Root(_provider, name);
             }
 
-            public void log(string category, string message)
+            public void log(string category, Func<string> message)
             {
-                LogMessages.Add(new KeyValuePair<string, string>(category, message));
+                LogMessages.Add(new KeyValuePair<string, string>(category, message()));
 
                 //_outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
                 //{
