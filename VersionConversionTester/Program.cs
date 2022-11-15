@@ -44,7 +44,7 @@ namespace VersionConversionTester
         {
             if (e.Resource is IConformanceResource cr)
             {
-                // System.Diagnostics.Trace.WriteLine($"{e.Url} {cr.Name}");
+                // Console.WriteLine($"{e.Url} {cr.Name}");
             }
         }
 
@@ -111,7 +111,7 @@ namespace VersionConversionTester
                                         && !a.Name.StartsWith("package/xml/")
                                         && a.Name != "package/.index.json")
                                     {
-                                        // System.Diagnostics.Trace.WriteLine($"{a.Name}");
+                                        // Console.WriteLine($"{a.Name}");
                                         await a.ExtractToFileAsync(Path.Combine(path, a.Name.Replace("package/", "")), true);
                                     }
                                     a = await r.GetNextEntryAsync();
@@ -181,7 +181,7 @@ namespace VersionConversionTester
                 // skip to the test file we want to check
                 //if (file.Name != "capabilitystatement-capabilitystatement-base(base).json")
                 //    continue;
-                System.Diagnostics.Trace.WriteLine($"{file.Name}");
+                Console.WriteLine($"{DateTime.Now}: {file.Name}");
                 using (var stream = file.Open())
                 {
                     using (var sr = new StreamReader(stream))
@@ -206,7 +206,7 @@ namespace VersionConversionTester
                             // Convert up to R4
                             if (!File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
                             {
-                                System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
+                                Console.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
 
@@ -225,14 +225,14 @@ namespace VersionConversionTester
                             if (!output.Success)
                             {
                                 itemResult.validationErrors++;
-                                System.Diagnostics.Trace.WriteLine(output.ToXml(_xmlSettings));
+                                Console.WriteLine(output.ToXml(_xmlSettings));
                             }
                             itemResult.resourceConverted++;
 
                             // Convert back down to STU3
                             if (!File.Exists($@"{mappinginterversion_folder}\r4\R4toR3\{target.Name}.map"))
                             {
-                                System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({target.Name}) that has no backward map");
+                                Console.WriteLine($"Skipping {file.Name} type ({target.Name}) that has no backward map");
                                 continue;
                             }
                             mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R4toR3\{sourceNode.Name}.map");
@@ -255,24 +255,26 @@ namespace VersionConversionTester
                         }
                         catch (System.Exception ex)
                         {
-                            System.Diagnostics.Trace.WriteLine(ex.Message);
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine(ex.Message);
                             itemResult.resourceErrors++;
+                            Console.ResetColor();
                         }
                     }
                 }
             }
-            System.Diagnostics.Trace.WriteLine($"Processed: {files.Count}");
-            System.Diagnostics.Trace.WriteLine($"Complete:  {results.Values.Sum(v => v.resourceConverted)}");
-            System.Diagnostics.Trace.WriteLine($"And back:  {results.Values.Sum(v => v.resourceConvertedBack)}");
-            System.Diagnostics.Trace.WriteLine($"Same xml:  {results.Values.Sum(v => v.identicalXml)}");
-            System.Diagnostics.Trace.WriteLine($"Same json: {results.Values.Sum(v => v.identicalJson)}");
-            System.Diagnostics.Trace.WriteLine($"Validation:{results.Values.Sum(v => v.validationErrors)}");
-            System.Diagnostics.Trace.WriteLine($"Exceptions:{results.Values.Sum(v => v.resourceErrors)}");
+            Console.WriteLine($"Processed: {files.Count}");
+            Console.WriteLine($"Complete:  {results.Values.Sum(v => v.resourceConverted)}");
+            Console.WriteLine($"And back:  {results.Values.Sum(v => v.resourceConvertedBack)}");
+            Console.WriteLine($"Same xml:  {results.Values.Sum(v => v.identicalXml)}");
+            Console.WriteLine($"Same json: {results.Values.Sum(v => v.identicalJson)}");
+            Console.WriteLine($"Validation:{results.Values.Sum(v => v.validationErrors)}");
+            Console.WriteLine($"Exceptions:{results.Values.Sum(v => v.resourceErrors)}");
 
             // Now output the table!
             foreach (var r in results)
             {
-                System.Diagnostics.Trace.WriteLine($"{r.Key}\t{r.Value.resourceConverted}\t{r.Value.identicalXml},{r.Value.identicalJson}\t{(r.Value.resourceConverted - r.Value.validationErrors) / r.Value.resourceConverted}\t{r.Value.validationErrors}");
+                Console.WriteLine($"{r.Key}\t{r.Value.resourceConverted}\t{r.Value.identicalXml},{r.Value.identicalJson}\t{(r.Value.resourceConverted - r.Value.validationErrors) / r.Value.resourceConverted}\t{r.Value.validationErrors}");
             }
 
             // Assert.AreEqual(0, results.Values.Sum(v => v.resourceErrors));
