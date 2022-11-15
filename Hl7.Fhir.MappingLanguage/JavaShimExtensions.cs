@@ -505,10 +505,10 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
-                if (value.Name == "@primitivevalue@")
-                {
+                if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
+                { 
                     // this is a primitive element
-                    Log("prop", $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType})");
+                    Log("prop", $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive");
                     en.Value = value.Value;
                     return en;
                 }

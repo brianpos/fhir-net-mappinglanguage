@@ -14,6 +14,9 @@ namespace Test.FhirMappingLanguage
     [TestClass]
     public class SimpleMapTests
     {
+        FhirXmlSerializationSettings _xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
+        FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
+
         [TestMethod]
         public void TransformStructureMap()
         {

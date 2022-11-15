@@ -14,7 +14,9 @@ namespace Test.FhirMappingLanguage
     [TestClass]
     public class SDOH_Tests
     {
+        // From github https://github.com/HL7/fhir-sdoh-clinicalcare.git
         const string pathSDOHClinicalCare = @"E:\git\HL7\fhir-sdoh-clinicalcare";
+        // const string pathSDOHClinicalCare = @"c:\git\HL7\fhir-sdoh-clinicalcare";
 
         private StructureMap GetFromMapFile(string relpath)
         {
