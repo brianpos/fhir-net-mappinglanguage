@@ -146,7 +146,9 @@ namespace demo_map_server.Services
                                 canonical = null;
                                 return false;
                             });
-                        var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+                        var mapServices = new InlineServices(outcome, provider);
+                        mapServices.DebugMode = operationParameters["debug"]?.Value != null;
+                        var engine = new StructureMapUtilitiesExecute(worker, mapServices, provider);
 
                         var tmi = provider.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
 
@@ -183,7 +185,6 @@ namespace demo_map_server.Services
                                 return outcome;
                             }
                         }
-
 
                         var target = ElementNode.Root(provider, tmi.TypeName);
                         engine.transform(null, resource.ToTypedElement(), sm, target);
