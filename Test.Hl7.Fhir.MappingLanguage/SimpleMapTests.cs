@@ -146,6 +146,70 @@ namespace Test.FhirMappingLanguage
         }
 
         [TestMethod]
+        public void TransformPrimitivesWithElement()
+        {
+            var mapText = @"
+                map ""http://fhirpath-lab.com/fhir/StructureMap/test-primitives"" = ""TestPrimitives""
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as source
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as target
+                group tutorial(source src : Observation, target tgt : Observation) {
+                    src.id as a -> tgt.id = a;
+                    src.category as c -> tgt.category = create('CodeableConcept') as cc then populateCategory(c, cc) ""cat-pop"";
+                }
+                group populateCategory(source src, target tgt){
+                    src.coding as vs0 -> tgt.coding = create('Coding') as vt0 then CodingFixCodeSystem(vs0, vt0);
+                    src -> tgt.text = 'Brian';
+                }
+                group CodingFixCodeSystem(source src : Coding, target tgt : Coding) {
+                    src.system where ($this='http://hl7.org/fhir/observation-category') -> tgt.system = 'http://terminology.hl7.org/CodeSystem/observation-category' ""patch system"";
+                    src.system where ($this!='http://hl7.org/fhir/observation-category') -> tgt.system ""default system"";
+                    src.version -> tgt.version;
+                    src.code -> tgt.code;
+                    src.display -> tgt.display;
+                    src.userSelected -> tgt.userSelected;
+                }
+
+                group Element(source src : Element, target tgt : Element) <<type+>> {
+                  src.id -> tgt.id ""Element-id"";
+                  src.extension -> tgt.extension ""Element-extensions"";
+                }
+                group uri(source src : uri, target tgt : uri) extends Element <<type+>> {
+                    src.value as v -> tgt.value = v ""uri-value"";
+                }
+                group code(source src : code, target tgt : code) extends Element <<type+>> {
+                  src.value as v -> tgt.value = v ""code-value"";
+                }
+                group Extension(source src : Extension, target tgt : Extension) extends Element <<type+>> {
+                  src.url -> tgt.url;
+                  src.value : code as vs -> tgt.value = create('code') as vt then code(vs, vt);
+                }";
+            var qr = new Observation();
+            qr.Id = "idval";
+            qr.Subject = new ResourceReference("Patient/1", "Brian");
+            qr.Encounter = new ResourceReference("Encounter/1", "Social Services");
+            qr.Category.Add(new CodeableConcept("http://example.org/glarb", "codeval", "disp value"));
+            qr.Category[0].Coding[0].CodeElement.SetExtension("http://example.org/demo", new Code("facetime"));
+
+            var parser = new StructureMapUtilitiesParse();
+            var sm = parser.parse(mapText, null);
+
+            var worker = TutorialTests.CreateWorker();
+            var provider = new PocoStructureDefinitionSummaryProvider();
+            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+
+            var target = engine.GenerateEmptyTargetOutputStructure(sm);
+            engine.transform(null, qr.ToTypedElement(), sm, target);
+            var output = target.ToPoco<Observation>();
+            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
+            System.Diagnostics.Trace.WriteLine(xml2);
+            Assert.AreEqual("idval", output.Id);
+            Assert.AreEqual("http://example.org/glarb", output.Category[0].Coding[0].System);
+            Assert.AreEqual("codeval", output.Category[0].Coding[0].Code);
+            Assert.AreEqual("facetime", output.Category[0].Coding[0].CodeElement.GetExtensionValue<Code>("http://example.org/demo").Value);
+            Assert.AreEqual("Brian", output.Category[0].Text);
+        }
+
+        [TestMethod]
         public void TransformStructureMap()
         {
             // https://fhir.dk.swisstph-mis.ch/matchbox/fhir/StructureMap/emcarea.registration.p
