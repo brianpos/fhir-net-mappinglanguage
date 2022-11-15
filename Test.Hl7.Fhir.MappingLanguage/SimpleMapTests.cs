@@ -42,6 +42,75 @@ namespace Test.FhirMappingLanguage
         }
 
         [TestMethod]
+        public void TransformPrimitives()
+        {
+            var mapText = @"
+                map ""http://fhirpath-lab.com/fhir/StructureMap/test-primitives"" = ""TestPrimitives""
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as source
+                uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as target
+                group tutorial(source src : Observation, target tgt : Observation) {
+                    src.text -> tgt.text;
+                    src.id as a -> tgt.id = a;
+                    src.category as c -> tgt.category = create('CodeableConcept') as cc then populateCategory(c, cc) ""cat-pop"";
+                }
+                group populateCategory(source src, target tgt){
+                    src.coding as vs0 -> tgt.coding = create('Coding') as vt0 then CodingFixCodeSystem(vs0, vt0);
+                    src -> tgt.text = 'Brian';
+                }
+                group CodingFixCodeSystem(source src : Coding, target tgt : Coding) {
+                    src.system where ($this='http://hl7.org/fhir/observation-category') -> tgt.system = 'http://terminology.hl7.org/CodeSystem/observation-category' ""patch system"";
+                    src.system where ($this!='http://hl7.org/fhir/observation-category') -> tgt.system ""default system"";
+                    src.version -> tgt.version;
+                    src.code -> tgt.code;
+                    src.display -> tgt.display;
+                    src.userSelected -> tgt.userSelected;
+                }
+
+                group Narrative(source src : Narrative, target tgt : Narrative) <<type+>> {
+                  src.status -> tgt.status;
+                  src.div -> tgt.div;
+                }
+                group xhtml(source src : xhtml, target tgt : xhtml) <<type+>> {
+                  src.value as v -> tgt.value = v ""xhtml-value"";
+                }
+                group uri(source src : uri, target tgt : uri)  <<type+>> {
+                    src.value as v -> tgt.value = v ""uri-value"";
+                }
+                group code(source src : code, target tgt : code) <<type+>> {
+                  src.value as v -> tgt.value = v ""code-value"";
+                }
+                ";
+            var qr = new Observation();
+            // qr.Text = new Narrative() { Status = Narrative.NarrativeStatus.Generated, Div = "<div>Observation</div>" };
+            qr.Id = "idval";
+            qr.Subject = new ResourceReference("Patient/1", "Brian");
+            qr.Encounter = new ResourceReference("Encounter/1", "Social Services");
+            qr.Category.Add(new CodeableConcept("http://example.org/glarb", "codeval1", "disp value1"));
+            qr.Category.Add(new CodeableConcept("http://hl7.org/fhir/observation-category", "codeval2", "disp value2"));
+
+            var parser = new StructureMapUtilitiesParse();
+            var sm = parser.parse(mapText, null);
+
+            var worker = TutorialTests.CreateWorker();
+            var provider = new PocoStructureDefinitionSummaryProvider();
+            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+            
+            var target = engine.GenerateEmptyTargetOutputStructure(sm);
+            engine.transform(null, qr.ToTypedElement(), sm, target);
+            // System.Diagnostics.Trace.WriteLine(target.ToXml(new FhirXmlSerializationSettings() { Pretty = true }));
+            var output = target.ToPoco<Observation>();
+            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
+            System.Diagnostics.Trace.WriteLine(xml2);
+            Assert.AreEqual("idval", output.Id);
+            Assert.AreEqual("Brian", output.Category[0].Text);
+            Assert.AreEqual("http://example.org/glarb", output.Category[0].Coding[0].System);
+            Assert.AreEqual("codeval1", output.Category[0].Coding[0].Code);
+            Assert.AreEqual("Brian", output.Category[1].Text);
+            Assert.AreEqual("http://terminology.hl7.org/CodeSystem/observation-category", output.Category[1].Coding[0].System);
+            Assert.AreEqual("codeval2", output.Category[1].Coding[0].Code);
+        }
+
+        [TestMethod]
         public void TransformNarrative()
         {
             var mapText = @"
