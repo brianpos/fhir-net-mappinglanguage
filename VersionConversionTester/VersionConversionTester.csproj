@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Test.Hl7.Fhir.MappingLanguage\CrossVersionResolver.cs" Link="CrossVersionResolver.cs" />
+    <Compile Include="..\Test.Hl7.Fhir.MappingLanguage\TestWorkerContext.cs" Link="TestWorkerContext.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hl7.Fhir.R4B" Version="4.3.0" />
+    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hl7.Fhir.MappingLanguage\Hl7.Fhir.MappingLanguage.csproj" />
+  </ItemGroup>
+
+</Project>
