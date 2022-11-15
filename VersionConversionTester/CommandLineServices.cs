@@ -29,6 +29,8 @@ namespace VersionConversionTester
 
         public void log(string category, string message)
         {
+            if (category != "error")
+                return;
             switch (category)
             {
                 case "error":
