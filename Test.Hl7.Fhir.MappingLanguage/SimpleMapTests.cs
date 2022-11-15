@@ -18,6 +18,30 @@ namespace Test.FhirMappingLanguage
         FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
 
         [TestMethod]
+        public void TestCapStatement()
+        {
+            // Not a real unit test, but a good test to debug the ElementNode
+            // content with a variety of field type.
+            var cs = new CapabilityStatement()
+            {
+                Id = "smile",
+                Title = "TitleXXX",
+                Name = "HelloName",
+                Date = "2022-12-01"
+            };
+            cs.Text = new Narrative() { Status = Narrative.NarrativeStatus.Generated, Div = "<div>Observation</div>" };
+            cs.TitleElement.SetStringExtension("http://example.org/test", "argh");
+
+            var target = cs.ToTypedElement();
+            var xml = target.ToXml(_xmlSettings);
+            var json = target.ToJson(_jsonSettings);
+            System.Diagnostics.Trace.WriteLine(xml);
+            System.Diagnostics.Trace.WriteLine(json);
+
+            var en = ElementNode.FromElement(target);
+        }
+
+        [TestMethod]
         public void TransformNarrative()
         {
             var mapText = @"
