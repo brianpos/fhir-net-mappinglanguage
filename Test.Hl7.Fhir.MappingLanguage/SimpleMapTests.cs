@@ -49,7 +49,6 @@ namespace Test.FhirMappingLanguage
                 uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as source
                 uses ""http://hl7.org/fhir/StructureDefinition/Observation"" alias Observation as target
                 group tutorial(source src : Observation, target tgt : Observation) {
-                    src.text -> tgt.text;
                     src.id as a -> tgt.id = a;
                     src.category as c -> tgt.category = create('CodeableConcept') as cc then populateCategory(c, cc) ""cat-pop"";
                 }
@@ -66,13 +65,6 @@ namespace Test.FhirMappingLanguage
                     src.userSelected -> tgt.userSelected;
                 }
 
-                group Narrative(source src : Narrative, target tgt : Narrative) <<type+>> {
-                  src.status -> tgt.status;
-                  src.div -> tgt.div;
-                }
-                group xhtml(source src : xhtml, target tgt : xhtml) <<type+>> {
-                  src.value as v -> tgt.value = v ""xhtml-value"";
-                }
                 group uri(source src : uri, target tgt : uri)  <<type+>> {
                     src.value as v -> tgt.value = v ""uri-value"";
                 }
@@ -81,7 +73,6 @@ namespace Test.FhirMappingLanguage
                 }
                 ";
             var qr = new Observation();
-            // qr.Text = new Narrative() { Status = Narrative.NarrativeStatus.Generated, Div = "<div>Observation</div>" };
             qr.Id = "idval";
             qr.Subject = new ResourceReference("Patient/1", "Brian");
             qr.Encounter = new ResourceReference("Encounter/1", "Social Services");
