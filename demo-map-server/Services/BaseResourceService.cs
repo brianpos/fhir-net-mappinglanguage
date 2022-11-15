@@ -188,7 +188,7 @@ namespace demo_map_server.Services
 
                         var target = ElementNode.Root(provider, tmi.TypeName);
                         engine.transform(null, resource.ToTypedElement(), sm, target);
-                        outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
+                        outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target, LogMessages = mapServices.FormatOutput() });
                     }
                     catch (Exception ex)
                     {

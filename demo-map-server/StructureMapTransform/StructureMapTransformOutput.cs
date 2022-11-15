@@ -6,5 +6,7 @@ namespace demo_map_server.StructureMapTransform
     {
         public string MimeType { get; set; }
         public ElementNode OutputContent { get; set; }
+
+        public string LogMessages { get; set; }
     }
 }

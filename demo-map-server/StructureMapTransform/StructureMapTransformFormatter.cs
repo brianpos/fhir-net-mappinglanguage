@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.Language.Debugging;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
@@ -7,6 +8,7 @@ using Hl7.Fhir.WebApi;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
+using Newtonsoft.Json;
 using System.Text;
 
 namespace demo_map_server.StructureMapTransform
@@ -34,6 +36,12 @@ namespace demo_map_server.StructureMapTransform
                     MediaTypeHeaderValue header = new MediaTypeHeaderValue(sto.MimeType);
                     header.Charset = Encoding.UTF8.WebName;
                     context.ContentType = new StringSegment(header.ToString());
+                }
+                // if there is only a small amount of logging, throw it in the headers
+                // https://stackoverflow.com/questions/1097651/is-there-a-practical-http-header-length-limit
+                if (!string.IsNullOrEmpty(sto.LogMessages) && sto.LogMessages.Length < 4000)
+                {
+                    context.HttpContext.Response.Headers.Add("debug", sto.LogMessages.Split("\r\n"));
                 }
             }
 

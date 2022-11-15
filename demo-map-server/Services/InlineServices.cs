@@ -2,6 +2,7 @@
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification;
+using System.Text;
 
 namespace demo_map_server.Services
 {
@@ -12,7 +13,17 @@ namespace demo_map_server.Services
         /// Debug Mode Off will not evaluate debug/trace messages which can be quite costly in that the variables are serialized out
         /// </summary>
         public bool DebugMode = false;
-            
+
+        public string FormatOutput()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var log in LogMessages)
+            {
+                sb.AppendLine($"{log.Key}: {log.Value}");
+            }
+            return sb.ToString();
+        }
+
         internal InlineServices(OperationOutcome outcome, IStructureDefinitionSummaryProvider provider)
         {
             _outcome = outcome;
@@ -35,12 +46,15 @@ namespace demo_map_server.Services
             if (DebugMode || category == "error")
                 LogMessages.Add(new KeyValuePair<string, string>(category, message()));
 
-            //_outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
-            //{
-            //    Code = OperationOutcome.IssueType.Informational,
-            //    Severity = OperationOutcome.IssueSeverity.Information,
-            //    Details = new CodeableConcept(null, null, message)
-            //});
+            if (category == "error")
+            {
+                _outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
+                {
+                    Code = OperationOutcome.IssueType.Informational,
+                    Severity = OperationOutcome.IssueSeverity.Information,
+                    Details = new CodeableConcept(null, null, message())
+                });
+            }
         }
 
         public List<ITypedElement> performSearch(object appContext, string url)
