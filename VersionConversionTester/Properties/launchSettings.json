@@ -1,0 +1,17 @@
+{
+  "profiles": {
+    "VersionConversionTester-C:": {
+      "commandName": "Project",
+      "commandLineArgs": "c:\\git\\hl7\\interversion c:\\temp\\examples-json.zip"
+    },
+    "VersionConversionTester-E:": {
+      "commandName": "Project",
+      "commandLineArgs": "e:\\git\\hl7\\interversion c:\\temp\\examples-json.zip"
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": "",
+      "commandLineArgs": "VersionConversionTester.dll /mnt/e/git/hl7/interversion /mnt/c/temp/examples-json.zip"
+    }
+  }
+}

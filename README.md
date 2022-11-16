@@ -33,6 +33,13 @@ Once you have these projects locally, update the path of these in the unit test 
 And not all unit tests actually have any assertions, some are done for debugging purposed and require manual
 checks of the output trace. (These will be fixed as the project matures)
 
+If you are on mac or linux or don't have the full Visual Studio and just want to run it from the commandline
+there is a test tool that you can use to run directly.
+``` bash
+brian@linux-test:fhir-net-mappinglanguage/VersionConversionTester$ dotnet run --project VersionConversionTester.csproj /mnt/c/git/hl7/interversion /mnt/c/temp/examples-json.zip
+```
+You can also run this in the visual studio debugger and select the paths via the launchSettings (created one for `e` and `c` drives)
+
 ## Getting Started ##
 Coming soon
 

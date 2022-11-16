@@ -18,15 +18,28 @@ namespace VersionConversionTester
         public static async Task Main(string[] args)
         {
             Console.WriteLine("Hello, FHIR Mappers!");
+            Console.WriteLine(string.Join(" ", args));
 
             var program = new Program();
+
+            // From github https://github.com/FHIR/interversion.git
+            // string mappinginterversion_folder = @"c:\git\HL7\interversion";
+            // string mappinginterversion_folder = @"e:\git\HL7\interversion";
+            string mappinginterversion_folder = @"/mnt/e/git/hl7/interversion";
+
+            // https://www.hl7.org/fhir/STU3/examples-json.zip
+            string examplesFile = @"/mnt/c/temp/examples-json.zip";
+
+            if (args.Length > 1)
+            {
+                mappinginterversion_folder = args[0];
+                examplesFile = args[1];
+            }
+
             await program.PrepareCrossVersionStructureDefinitionCache();
-            await program.ConvertAllStu3ExamplesToR4FromZip();
+            await program.ConvertAllStu3ExamplesToR4FromZip(examplesFile, mappinginterversion_folder);
         }
 
-        // From github https://github.com/FHIR/interversion.git
-        // const string mappinginterversion_folder = @"c:\git\HL7\interversion";
-        const string mappinginterversion_folder = @"e:\git\HL7\interversion";
 
         public Program()
         {
@@ -137,14 +150,12 @@ namespace VersionConversionTester
             public int identicalJson = 0;
         }
 
-        public async System.Threading.Tasks.Task ConvertAllStu3ExamplesToR4FromZip()
+        public async System.Threading.Tasks.Task ConvertAllStu3ExamplesToR4FromZip(string examplesFile, string mappinginterversion_folder)
         {
             // This test will end up producing an error report like the one at https://www.hl7.org/fhir/r3maps.html
             Dictionary<string, ResourceTestResult> results = new Dictionary<string, ResourceTestResult>();
 
             // Download the examples zip file
-            // https://www.hl7.org/fhir/STU3/examples-json.zip
-            string examplesFile = @"c:\temp\examples-json.zip";
             if (!File.Exists(examplesFile))
             {
                 HttpClient server = new HttpClient();
