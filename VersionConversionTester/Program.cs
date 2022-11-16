@@ -17,7 +17,7 @@ namespace VersionConversionTester
     {
         public static async Task Main(string[] args)
         {
-            Console.WriteLine("Hello, World!");
+            Console.WriteLine("Hello, FHIR Mappers!");
 
             var program = new Program();
             await program.PrepareCrossVersionStructureDefinitionCache();
@@ -155,8 +155,8 @@ namespace VersionConversionTester
             }
 
             // mapper engine parts
-            var workerR3toR4 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R3toR4");
-            var workerR4toR3 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R4toR3");
+            var workerR3toR4 = new TestWorker(_source, Path.Combine(mappinginterversion_folder, "r4", "R3toR4"));
+            var workerR4toR3 = new TestWorker(_source, Path.Combine(mappinginterversion_folder, "r4", "R4toR3"));
             var parser = new StructureMapUtilitiesParse();
             IStructureDefinitionSummaryProvider providerR4 = new StructureDefinitionSummaryProvider(_sourceR4);
             IStructureDefinitionSummaryProvider providerR3 = new StructureDefinitionSummaryProvider(_sourceR3);
@@ -181,7 +181,7 @@ namespace VersionConversionTester
                 // skip to the test file we want to check
                 //if (file.Name != "capabilitystatement-capabilitystatement-base(base).json")
                 //    continue;
-                Console.WriteLine($"{DateTime.Now}: {file.Name}");
+                Console.WriteLine($"{DateTime.Now.ToString("u")}: {file.Name}");
                 using (var stream = file.Open())
                 {
                     using (var sr = new StreamReader(stream))
@@ -204,13 +204,14 @@ namespace VersionConversionTester
                         try
                         {
                             // Convert up to R4
-                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
+                            string sourceMapFilename = Path.Combine(mappinginterversion_folder, "r4", "R3toR4", $"{sourceNode.Name}.map");
+                            if (!File.Exists(sourceMapFilename))
                             {
                                 Console.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
 
-                            var mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map");
+                            var mapText = File.ReadAllText(sourceMapFilename);
                             var sm = parser.parse(mapText, null);
                             var source = engine3to4.GetSourceInput(sm, sourceNode, providerR3);
                             var target = engine3to4.GenerateEmptyTargetOutputStructure(sm);
@@ -230,12 +231,13 @@ namespace VersionConversionTester
                             itemResult.resourceConverted++;
 
                             // Convert back down to STU3
-                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R4toR3\{target.Name}.map"))
+                            sourceMapFilename = Path.Combine(mappinginterversion_folder, "r4", "R4toR3", $"{target.Name}.map");
+                            if (!File.Exists(sourceMapFilename))
                             {
                                 Console.WriteLine($"Skipping {file.Name} type ({target.Name}) that has no backward map");
                                 continue;
                             }
-                            mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R4toR3\{sourceNode.Name}.map");
+                            mapText = File.ReadAllText(sourceMapFilename);
                             sm = parser.parse(mapText, null);
                             var targetR3 = engine4to3.GenerateEmptyTargetOutputStructure(sm);
                             engine4to3.transform(null, target, sm, targetR3);
