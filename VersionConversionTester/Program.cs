@@ -159,10 +159,12 @@ namespace VersionConversionTester
             if (!File.Exists(examplesFile))
             {
                 HttpClient server = new HttpClient();
-                var stream = await server.GetStreamAsync("https://www.hl7.org/fhir/STU3/examples-json.zip");
-                var outStream = File.OpenWrite(examplesFile);
-                await stream.CopyToAsync(outStream);
-                await outStream.FlushAsync();
+                using (var stream = await server.GetStreamAsync("https://www.hl7.org/fhir/STU3/examples-json.zip"))
+                using (var outStream = File.OpenWrite(examplesFile))
+                {
+                    await stream.CopyToAsync(outStream);
+                    await outStream.FlushAsync();
+                }
             }
 
             // mapper engine parts
