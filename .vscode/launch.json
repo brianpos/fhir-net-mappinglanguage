@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run VersionConversionTester",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-versiontester",
+            "program": "${workspaceFolder}/VersionConversionTester/bin/Debug/net7.0/VersionConversionTester.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "logging": {
+              "moduleLoad": false
+            }
+        }
+        
+    ]
+}
