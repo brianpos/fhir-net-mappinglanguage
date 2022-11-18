@@ -35,6 +35,7 @@
 
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
@@ -261,9 +262,13 @@ namespace Hl7.Fhir.MappingLanguage
                     return null;
                 if (ModelInfo.IsPrimitive(_object.InstanceType))
                     return _name + ": \"" + _object.Value?.ToString() + '"';
-                if (ModelInfo.IsKnownResource(_object.InstanceType))
-                    return _name + ": \"" + (_object.Value?.DebuggerDisplayString() ?? _object.Value?.GetHashCode().ToString()) + '"';
-                return _name + ": (" + _object.InstanceType + ")";
+                string debuggerString = _object.Value?.DebuggerDisplayString();
+                if (!string.IsNullOrEmpty(debuggerString))
+                    return $"{_name}: \"{debuggerString}\"";
+                string json = _object?.ToJson();
+                if (json.Length > 100)
+                    return $"{_name}: {json.Substring(0, 50)}...";
+                return _name + ": (" + json + ")";
             }
         }
 
@@ -327,7 +332,7 @@ namespace Hl7.Fhir.MappingLanguage
                             sh.Add(v.summary());
                             break;
                     }
-                return "source variables [" + string.Join(",", s) + "], target variables [" + string.Join(",", t) + "], shared variables [" + string.Join(",", sh) + "]";
+                return "source variables [" + string.Join(",    ", s) + "],      target variables [" + string.Join(",    ", t) + "],       shared variables [" + string.Join(",    ", sh) + "]";
             }
 
         }
