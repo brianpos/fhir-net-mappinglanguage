@@ -30,19 +30,15 @@
 // Portions ported from/compatible with https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/model/StructureMap.java
 
 using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Introspection;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Utility;
-using Newtonsoft.Json.Linq;
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml;
-using System.Xml.Linq;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.Model.ElementDefinition;
 
@@ -506,18 +502,26 @@ namespace Hl7.Fhir.MappingLanguage
             if (me is ElementNode en)
             {
                 if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
-                { 
+                {
                     // this is a primitive element
                     Log("prop", () => $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive");
                     en.Value = value.Value;
                     return en;
                 }
+
+                // we've dealt with primitive value setters, so any primitives coming through need to be converted to fhir types
+                if (value.Name == "@primitivevalue@")
+                {
+                    // first try converting to a FHIR value
+                    value = new[] { value }.ToFhirValues().FirstOrDefault().ToTypedElement();
+                }
+
                 // clone the element in (CodeableConcept child values)
                 var ne = ElementNode.FromElement(value, true);
                 if (me.Definition != null)
                 {
                     // Check if this is a multi-cardinality item
-                    var cd = me.ChildDefinitions(pkp).FirstOrDefault(cd => cd.ElementName== name);
+                    var cd = me.ChildDefinitions(pkp).FirstOrDefault(cd => cd.ElementName == name);
                     if (cd != null)
                     {
                         if (!cd.IsCollection)
@@ -525,10 +529,17 @@ namespace Hl7.Fhir.MappingLanguage
                             // Remove any existing values
                             if (me.Children(name).Any())
                             {
-                                Log("prop", () => $"Replacing an existing node {name} at {me.Location}");
+                                Log("prop", () => $"Replacing an existing node at {me.Location}.{name}");
                                 en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
                                 return ne;
                             }
+                        }
+
+                        // Need to check if the types are ok to use
+                        if (!cd.Type.Any(t => t.GetTypeName() == value.InstanceType))
+                        {
+                            // this type isn't in the list, so we need to perform some type co-ersion
+                            Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
                         }
                     }
                 }
