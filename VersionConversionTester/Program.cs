@@ -26,6 +26,7 @@ namespace VersionConversionTester
             // string mappinginterversion_folder = @"c:\git\HL7\interversion";
             // string mappinginterversion_folder = @"e:\git\HL7\interversion";
             string mappinginterversion_folder = @"/mnt/e/git/hl7/interversion";
+            string? outputFolder = null;
 
             // https://www.hl7.org/fhir/STU3/examples-json.zip
             string examplesFile = @"/mnt/c/temp/examples-json.zip";
@@ -34,10 +35,27 @@ namespace VersionConversionTester
             {
                 mappinginterversion_folder = args[0];
                 examplesFile = args[1];
+                if (args.Length > 2)
+                    outputFolder = args[2];
+            }
+            else
+            {
+                // check if there environment variables to fall back to
+                string? val = Environment.GetEnvironmentVariable("FHIR_MAPPER_MAPFOLDER");
+                if (val != null)
+                    mappinginterversion_folder = val;
+
+                val = Environment.GetEnvironmentVariable("FHIR_MAPPER_INPUT");
+                if (val != null)
+                    examplesFile = val;
+
+                val = Environment.GetEnvironmentVariable("FHIR_MAPPER_OUTPUTFOLDER");
+                if (val != null)
+                    outputFolder = val;
             }
 
             await program.PrepareCrossVersionStructureDefinitionCache();
-            await program.ConvertAllStu3ExamplesToR4FromZip(examplesFile, mappinginterversion_folder);
+            await program.ConvertAllStu3ExamplesToR4FromZip(examplesFile, mappinginterversion_folder, outputFolder);
         }
 
 
@@ -150,7 +168,7 @@ namespace VersionConversionTester
             public int identicalJson = 0;
         }
 
-        public async System.Threading.Tasks.Task ConvertAllStu3ExamplesToR4FromZip(string examplesFile, string mappinginterversion_folder)
+        public async System.Threading.Tasks.Task ConvertAllStu3ExamplesToR4FromZip(string examplesFile, string mappinginterversion_folder, string outputFolder)
         {
             // This test will end up producing an error report like the one at https://www.hl7.org/fhir/r3maps.html
             Dictionary<string, ResourceTestResult> results = new Dictionary<string, ResourceTestResult>();
@@ -179,6 +197,14 @@ namespace VersionConversionTester
             var engine4to3 = new StructureMapUtilitiesExecute(workerR4toR3, debuggerConsole4to3, providerR3);
 
             var validator = new Validator(new ValidationSettings() { ResourceResolver = _source });
+
+            bool createOutput = false;
+            if (!string.IsNullOrEmpty(outputFolder))
+            {
+                createOutput = true;
+                if (!Directory.Exists(outputFolder))
+                    Directory.CreateDirectory(outputFolder);
+            }
 
             // scan all the files in the zip
             var inputPath = ZipFile.OpenRead(examplesFile);
@@ -233,15 +259,41 @@ namespace VersionConversionTester
                             var xmlR4 = target.ToXml(_xmlSettings);
                             var jsonR4 = target.ToJson(_jsonSettings);
 
+                            itemResult.resourceConverted++;
+
+                            if (createOutput)
+                            {
+                                if (file.Name.EndsWith(".json"))
+                                    File.WriteAllText(Path.Combine(outputFolder, $"{file.Name}"), jsonR4);
+                                else
+                                    File.WriteAllText(Path.Combine(outputFolder, $"{file.Name}"), xmlR4);
+                            }
+
                             // Validate this content as R4
                             // var poco = target.ToPoco<Resource>(new PocoBuilderSettings() { AllowUnrecognizedEnums = true });
                             var output = validator.Validate(target);
+                            string validationResultFile = Path.Combine(outputFolder, $"{new FileInfo(file.Name).Name}.validation.xml");
                             if (!output.Success)
                             {
+                                // strip out the warning/informational messages to reduce the amount of diagnostics coming out
+                                output.Issue.RemoveAll(i => i.Severity == OperationOutcome.IssueSeverity.Warning || i.Severity == OperationOutcome.IssueSeverity.Information);
                                 itemResult.validationErrors++;
-                                Console.WriteLine(output.ToXml(_xmlSettings));
+                                if (createOutput)
+                                {
+                                    File.WriteAllText(validationResultFile, output.ToXml(_xmlSettings));
+                                    Console.WriteLine($"   - Validation failed, {validationResultFile}");
+                                }
+                                else
+                                {
+                                    Console.WriteLine(output.ToXml(_xmlSettings));
+                                }
                             }
-                            itemResult.resourceConverted++;
+                            else
+                            {
+                                // delete a file from last time if it still exists
+                                if (File.Exists(validationResultFile))
+                                    File.Delete(validationResultFile);
+                            }
 
                             // Convert back down to STU3
                             sourceMapFilename = Path.Combine(mappinginterversion_folder, "r4", "R4toR3", $"{target.Name}.map");

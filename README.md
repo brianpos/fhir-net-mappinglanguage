@@ -24,6 +24,8 @@ There are a few minor tricks to get the unit tests running locally as they depen
 projects for the source content, specifically:
 * https://github.com/FHIR/interversion.git
 * https://github.com/HL7/fhir-sdoh-clinicalcare.git
+    * There are a few issues with these maps that i've resolved in this branch
+	https://github.com/brianpos/interversion/tree/Feature/BP-R3-R4mapupdates
 
 Once you have these projects locally, update the path of these in the unit test classes
 
