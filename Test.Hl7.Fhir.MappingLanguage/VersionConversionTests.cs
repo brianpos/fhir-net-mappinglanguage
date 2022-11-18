@@ -155,7 +155,8 @@ namespace Test.FhirMappingLanguage
             IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(_sourceR3);
             IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR4);
 
-            var engine = new StructureMapUtilitiesExecute(worker, null, providerTarget);
+            var services = new UnitTestFmlEngineServices(providerTarget);
+            var engine = new StructureMapUtilitiesExecute(worker, services, providerTarget);
             var source = engine.GetSourceInput(sm, sourceNode, providerSource);
             var target = engine.GenerateEmptyTargetOutputStructure(sm);
 
@@ -307,8 +308,10 @@ namespace Test.FhirMappingLanguage
             var parser = new StructureMapUtilitiesParse();
             IStructureDefinitionSummaryProvider providerR4 = new StructureDefinitionSummaryProvider(_sourceR4);
             IStructureDefinitionSummaryProvider providerR3 = new StructureDefinitionSummaryProvider(_sourceR3);
-            var engine3to4 = new StructureMapUtilitiesExecute(workerR3toR4, null, providerR4);
-            var engine4to3 = new StructureMapUtilitiesExecute(workerR4toR3, null, providerR3);
+            var services3to4 = new UnitTestFmlEngineServices(providerR4);
+            var services4to3 = new UnitTestFmlEngineServices(providerR3);
+            var engine3to4 = new StructureMapUtilitiesExecute(workerR3toR4, services3to4, providerR4);
+            var engine4to3 = new StructureMapUtilitiesExecute(workerR4toR3, services4to3, providerR3);
 
             var validator = new Validator(new ValidationSettings() { ResourceResolver = _source });
 
@@ -437,9 +440,10 @@ namespace Test.FhirMappingLanguage
             // mapper engine parts
             var workerR4toR3 = new TestWorker(_source, mapFolder);
             var parser = new StructureMapUtilitiesParse();
-            IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR3);
             IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(_sourceR4);
-            var engine = new StructureMapUtilitiesExecute(workerR4toR3, null, providerTarget);
+            IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR3);
+            var services = new UnitTestFmlEngineServices(providerTarget);
+            var engine = new StructureMapUtilitiesExecute(workerR4toR3, services, providerTarget);
 
             // scan all the files in the zip
             int filesProcessed = 0;
@@ -514,7 +518,8 @@ namespace Test.FhirMappingLanguage
             var parser = new StructureMapUtilitiesParse();
             IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(_sourceR3);
             IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR4);
-            var engine = new StructureMapUtilitiesExecute(worker, null, providerTarget);
+            var services = new UnitTestFmlEngineServices(providerTarget);
+            var engine = new StructureMapUtilitiesExecute(worker, services, providerTarget);
 
             // scan all the files in the zip
             int filesProcessed = 0;
