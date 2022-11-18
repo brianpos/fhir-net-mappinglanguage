@@ -6,6 +6,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
 using Hl7.FhirPath;
+using System.IO;
 using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -20,7 +21,7 @@ namespace Test.FhirMappingLanguage
 
         private StructureMap GetFromMapFile(string relpath)
         {
-            var resourceMap = System.IO.File.ReadAllText($"{pathSDOHClinicalCare}{relpath}");
+            var resourceMap = System.IO.File.ReadAllText(Path.Combine(pathSDOHClinicalCare, relpath));
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(resourceMap, null);
             return sm;
@@ -29,14 +30,14 @@ namespace Test.FhirMappingLanguage
         private T GetFhirResourceFromJson<T>(string relpath)
             where T : Resource, new()
         {
-            var resourceJson = System.IO.File.ReadAllText($"{pathSDOHClinicalCare}{relpath}");
+            var resourceJson = System.IO.File.ReadAllText(Path.Combine(pathSDOHClinicalCare, relpath));
             var rp = new FhirJsonParser();
             return rp.Parse<T>(resourceJson);
         }
         private T GetFhirResourceFromXml<T>(string relpath)
             where T : Resource, new()
         {
-            var resourceJson = System.IO.File.ReadAllText($"{pathSDOHClinicalCare}{relpath}");
+            var resourceJson = System.IO.File.ReadAllText(Path.Combine(pathSDOHClinicalCare, relpath));
             var rp = new FhirXmlParser();
             return rp.Parse<T>(resourceJson);
         }
@@ -49,15 +50,15 @@ namespace Test.FhirMappingLanguage
             };
             return new CachedResolver(
                 new MultiResolver(
-                    new DirectorySource($"{pathSDOHClinicalCare}\\output", ds),
+                    new DirectorySource(Path.Combine(pathSDOHClinicalCare, "output"), ds),
                     ZipSource.CreateValidationSource()));
         }
 
         [TestMethod]
         public void TransformPrapareMap()
         {
-            var sm = GetFromMapFile(@"\input\map-source\SDOHCC-PRAPARE-Map.map");
-            var qr = GetFhirResourceFromXml<QuestionnaireResponse>(@"\input\resources\questionnaireresponse\SDOHCC-QuestionnaireResponsePRAPAREExample.xml");
+            var sm = GetFromMapFile(Path.Combine("input", "map-source", "SDOHCC-PRAPARE-Map.map"));
+            var qr = GetFhirResourceFromXml<QuestionnaireResponse>(Path.Combine("input", "resources", "questionnaireresponse", "SDOHCC-QuestionnaireResponsePRAPAREExample.xml"));
 
             var source = GetSource();
             var worker = new TestWorker(source);
@@ -83,8 +84,8 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void TransformVitalsMap()
         {
-            var sm = GetFromMapFile(@"\input\map-source\SDOHCC-Hunger-Vital-Sign-Map.map");
-            var qr = GetFhirResourceFromXml<QuestionnaireResponse>(@"\input\resources\questionnaireresponse\SDOHCC-QuestionnaireResponseHungerVitalSignExample.xml");
+            var sm = GetFromMapFile(Path.Combine("input", "map-source", "SDOHCC-Hunger-Vital-Sign-Map.map"));
+            var qr = GetFhirResourceFromXml<QuestionnaireResponse>(Path.Combine("input", "resources", "questionnaireresponse", "SDOHCC-QuestionnaireResponseHungerVitalSignExample.xml"));
 
             var source = GetSource();
             var worker = new TestWorker(source);
