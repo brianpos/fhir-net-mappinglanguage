@@ -209,7 +209,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         public ElementNode GenerateEmptyTargetOutputStructure(StructureMap sm)
         {
-            var typeInfo = pkp.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
+            IStructureDefinitionSummary typeInfo = null;
 
             GroupComponent g = sm.Group.First();
             var gt = g.Input.FirstOrDefault(i => i.Mode == StructureMapInputMode.Target);
@@ -218,6 +218,24 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 // narrow this list down to the type
                 typeInfo = pkp.Provide(s.Url);
+            }
+            else
+            {
+                // Scan all the targets and resolve the types to get their specific typename
+                foreach (StructureComponent tt in sm.Structure.Where(s => s.Mode == StructureMapModelMode.Target && !string.IsNullOrEmpty(s.Url)))
+                {
+                    var ti = pkp.Provide(tt.Url);
+                    if (ti != null && ti.TypeName == gt.Type)
+                    {
+                        typeInfo = ti;
+                        break;
+                    }
+                }
+            }
+            if (typeInfo == null)
+            {
+                log("warning", () => $"Unable to interpret output type [{gt.Type}], using Bundle");
+                typeInfo = pkp.Provide("http://hl7.org/fhir/StructureDefinition/Bundle");
             }
 
             var target = ElementNode.Root(pkp, typeInfo.TypeName);
