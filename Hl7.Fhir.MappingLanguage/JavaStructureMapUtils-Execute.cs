@@ -1071,8 +1071,13 @@ namespace Hl7.Fhir.MappingLanguage
                     case StructureMap.StructureMapTransform.C:
                         if (tgt.Parameter.Count < 2)
                             throw new Exception($"Rule \"{ruleId}\": cannot transform a Coding with less than 2 parameters");
-                        Coding c = buildCoding(getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString()), getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()), tgt.Parameter.Count >= 2 ? getParamStringNoNull(vars, tgt.Parameter[2], tgt.ToString()) : null);
+                        {
+                            string system = getParamStringNoNull(vars, tgt.Parameter.First(), tgt.ToString());
+                            string code = getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString());
+                            string display = tgt.Parameter.Count > 2 ? getParamStringNoNull(vars, tgt.Parameter[2], tgt.ToString()) : null;
+                            Coding c = buildCoding(system, code, display);
                         return c.ToTypedElement();
+                        }
 
                     default:
                         throw new Exception("Rule \"" + ruleId + "\": Transform Unknown: " + tgt.Transform.GetLiteral());
