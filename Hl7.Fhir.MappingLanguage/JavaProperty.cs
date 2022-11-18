@@ -181,6 +181,14 @@ namespace Hl7.Fhir.MappingLanguage
             return isPrimitive(code);
         }
 
+        // https://github.com/hapifhir/org.hl7.fhir.core/blob/dbef06873089dfc1f3bbf4e97a8f7577c77925de/org.hl7.fhir.r5/src/main/java/org/hl7/fhir/r5/utils/TypesUtilities.java#L174
+        static readonly string[] _primitiveTypes = { 
+            "boolean", "integer", "integer64", "string", "decimal",
+            "uri", "url", "canonical", "base64Binary", "instant",
+            "date", "dateTime", "time", "code", "oid",
+            "id", "uuid", "markdown", "unsignedInt", "positiveInt",
+            "xhtml" 
+        };
         /**
          * Is the given type a primitive
          *
@@ -188,7 +196,10 @@ namespace Hl7.Fhir.MappingLanguage
          */
         public static bool isPrimitive(String code)
         {
-            return ModelInfo.IsPrimitive(code);
+            // https://github.com/brianpos/firely-net-common/blob/develop/src/Hl7.Fhir.ElementModel/TypedElementOnSourceNode.cs#L123
+            return _primitiveTypes.Contains(code);
+            
+            // return ModelInfo.IsPrimitive(code);
             // was this... but this can be very inefficient compared to hard coding the list
             //		StructureDefinition sd = context.fetchTypeDefinition(code);
             //      return sd != null && sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE;
