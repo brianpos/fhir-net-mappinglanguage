@@ -6,7 +6,7 @@
     },
     "VersionConversionTester-E:": {
       "commandName": "Project",
-      "commandLineArgs": "e:\\git\\hl7\\interversion c:\\temp\\examples-json.zip"
+      "commandLineArgs": "e:\\git\\hl7\\interversion c:\\temp\\examples-json.zip c:\\temp\\examples-json-output"
     },
     "WSL": {
       "commandName": "WSL2",
