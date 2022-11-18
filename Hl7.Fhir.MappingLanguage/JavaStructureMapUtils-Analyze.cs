@@ -1117,7 +1117,7 @@ namespace Hl7.Fhir.MappingLanguage
                     if (expr == null)
                     {
                         expr = fpe.parse(getParamString(vars, tgt.Parameter[tgt.Parameter.Count() - 1]));
-                        tgt.setUserData(MAP_WHERE_EXPRESSION, expr);
+                        tgt.setUserData(MAP_EXPRESSION, expr);
                     }
                     return fpe.check(vars, null, expr);
 

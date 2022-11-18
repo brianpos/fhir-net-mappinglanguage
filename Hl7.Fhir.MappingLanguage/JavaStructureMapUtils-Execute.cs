@@ -981,8 +981,12 @@ namespace Hl7.Fhir.MappingLanguage
                                 // This is the "short circuit" format of the fhirpath expression
                                 var expression = getParamStringNoNull(vars, tgt.Parameter[0], tgt.ToString());
                                 expr = fpe.parse(expression);
-                                if (!expr.getName().StartsWith("%"))
-                                    expr.setName("%" + expr.getName());
+                                if (!string.IsNullOrEmpty(expr.getName()) && !expr.getName().StartsWith("%"))
+                                {
+                                    // Check if this name is in the variables
+                                    if (vars.All().Any(v => v.Name == expr.getName()))
+                                        expr.setName("%" + expr.getName());
+                                }
                             }
                             else if (tgt.Parameter.Count == 2)
                                 expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));

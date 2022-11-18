@@ -1122,6 +1122,12 @@ namespace Hl7.Fhir.MappingLanguage
                 source.Context = "@search";
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
+                if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+                {
+                    // Check if this name is in the variables
+                    if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                        node.setName("%" + node.getName());
+                }
                 source.setUserData(MAP_SEARCH_EXPRESSION, node);
                 source.Element = node.ToString();
                 lexer.token(")");
@@ -1160,6 +1166,12 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
+                if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+                {
+                    // Check if this name is in the variables
+                    if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                        node.setName("%" + node.getName());
+                }
                 source.setUserData(MAP_WHERE_EXPRESSION, node);
                 source.Condition = node.ToString();
             }
@@ -1167,6 +1179,12 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
+                if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+                {
+                    // Check if this name is in the variables
+                    if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                        node.setName("%" + node.getName());
+                }
                 source.setUserData(MAP_WHERE_CHECK, node);
                 source.Check = node.ToString();
             }
@@ -1174,6 +1192,12 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
+                if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+                {
+                    // Check if this name is in the variables
+                    if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                        node.setName("%" + node.getName());
+                }
                 source.setUserData(MAP_WHERE_LOG, node);
                 source.LogMessage = node.ToString();
             }
@@ -1213,7 +1237,11 @@ namespace Hl7.Fhir.MappingLanguage
                 ExpressionNode node = fpe.parse(lexer);
                 target.addParameter().Value = new FhirString(node.ToString());
                 if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
-                    node.setName("%" + node.getName());
+                {
+                    // Check if this name is in the variables
+                    if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                        node.setName("%" + node.getName());
+                }
                 target.setUserData(MAP_EXPRESSION, node);
                 lexer.token(")");
             }
@@ -1226,6 +1254,12 @@ namespace Hl7.Fhir.MappingLanguage
                     parseParameter(target, lexer);
                     lexer.token(",");
                     ExpressionNode node = fpe.parse(lexer);
+                    if (!string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+                    {
+                        // Check if this name is in the variables
+                        if (rule.Source.Any(s => s.Variable == node.getName()) || rule.Target.Any(s => s.Variable == node.getName()))
+                            node.setName("%" + node.getName());
+                    }
                     target.setUserData(MAP_EXPRESSION, node);
                     target.addParameter().Value = new FhirString(node.ToString());
                 }
