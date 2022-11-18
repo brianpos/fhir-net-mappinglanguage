@@ -18,6 +18,7 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
