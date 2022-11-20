@@ -176,6 +176,14 @@ namespace Hl7.Fhir.MappingLanguage
             // need to do this extraction from the actual dotnet implementation
             if (functionName == "toDate")
                 return new FunctionDetails("toDate", 0, 0);
+            if (functionName == "split")
+                return new FunctionDetails("split", 1, 1);
+            if (functionName == "join")
+                return new FunctionDetails("join", 1, 1);
+            if (functionName == "encode")
+                return new FunctionDetails("encode", 1, 1);
+            if (functionName == "decode")
+                return new FunctionDetails("decode", 1, 1);
             throw new NotImplementedException();
         }
 
