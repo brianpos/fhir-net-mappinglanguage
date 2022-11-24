@@ -20,6 +20,7 @@ using System.Data.SqlTypes;
 using System.Linq;
 using System.Collections.Generic;
 using System.Collections;
+using System.Text;
 
 namespace Test.FhirMappingLanguage
 {
@@ -71,7 +72,7 @@ namespace Test.FhirMappingLanguage
             pat.Name.Add(new HumanName().WithGiven("Brian").AndFamily("Pos"));
             pat.Name[0].GivenElement.Add(new FhirString("R"));
             pat.Name.Add(new HumanName().WithGiven("Maiden").AndFamily("Postlethwaite"));
-          
+
             // this is the linq version
             var v = pat.Name.Where(n => n.Family == "Pos").SelectMany(v => v.GivenElement.Skip(1).First());
             v = pat.Name.Where(val => (val.FamilyElement.Value == "Pos")).SelectMany(val => val.GivenElement).Skip(1).First();
@@ -111,7 +112,7 @@ namespace Test.FhirMappingLanguage
             //        System.Diagnostics.Trace.WriteLine($"{val}");
             //}
             //else
-                System.Diagnostics.Trace.WriteLine($"{fe}");
+            System.Diagnostics.Trace.WriteLine($"{fe}");
             System.Diagnostics.Trace.WriteLine($"---");
 
             // Now lets do some performance testing
@@ -137,12 +138,25 @@ namespace Test.FhirMappingLanguage
             Console.WriteLine($"Brian's Linq compiled fhirpath: {sw.ElapsedMilliseconds}ms");
         }
 
+        string DebugDump(ITypedElement te)
+        {
+            return te.ToXml();
+        }
+        string DebugDump(IEnumerable<ITypedElement> te)
+        {
+            return String.Join("\r\n", te.Select(t =>
+            {
+                return t.ToXml();
+            }));
+        }
+
         [TestMethod]
         public void TestFhirPathITypedElementExpressionVisitor()
         {
-            string fhirpath = "name[0]\n.given[0]";
+            string fhirpath = "name[0]\n.given[2]";
             // string fhirpath = "name[0]\n.given[0] & ' - smile'";
             // string fhirpath = "deceased";
+            // string fhirpath = "gender";
             var pat = new Patient()
             {
                 Id = "pat1",
@@ -153,6 +167,10 @@ namespace Test.FhirMappingLanguage
             pat.Name.Add(new HumanName().WithGiven("Brian").AndFamily("Pos"));
             pat.Name[0].GivenElement.Add(new FhirString("R"));
             pat.Name.Add(new HumanName().WithGiven("Maiden").AndFamily("Postlethwaite"));
+
+            var te = pat.ToTypedElement();
+            System.Console.WriteLine($"Patient: {DebugDump(te)}");
+            System.Console.WriteLine($"Patient: {DebugDump(te.Children("gender"))}");
 
             var fpc = new FhirPathCompiler();
             var ex = fpc.Parse(fhirpath);
@@ -166,34 +184,35 @@ namespace Test.FhirMappingLanguage
             Console.WriteLine(fo.Canonical());
 
             // Remap to a Linq style Expression direct on the object model!
-            var ctx = Expression.Parameter(pat.GetType(), "%resource");
+            var ctx = Expression.Parameter(typeof(ITypedElement), "%resource");
             var ce = RemapITypedElement(ex, ctx);
             Console.WriteLine($"{ce}");
             if (ce.CanReduce)
                 ce = ce.ReduceAndCheck();
-            var q = Expression.Lambda<Func<Patient, object>>(ce, ctx);
+            var q = Expression.Lambda<Func<ITypedElement, IEnumerable<ITypedElement>>>(ce, ctx);
             var eval = q.Compile();
-            var fe = eval(pat);
-            System.Diagnostics.Trace.WriteLine($"{fe}");
+            var fe = eval(pat.ToTypedElement());
+            System.Diagnostics.Trace.WriteLine($"{DebugDump(fe)}");
 
             // Now lets do some performance testing
             var sw = new Stopwatch();
-            int count = 10000;
+            int count = 100000;
             sw.Start();
             for (int i = 0; i < count; i++)
                 pat.Select(fhirpath);
             sw.Stop();
             Console.WriteLine($"Regular Firely fhirpath: {sw.ElapsedMilliseconds}ms");
 
+            var patTE = pat.ToTypedElement();
             sw.Restart();
             for (int i = 0; i < count; i++)
-                e(pat.ToTypedElement(), new EvaluationContext());
+                e(patTE, new EvaluationContext());
             sw.Stop();
             Console.WriteLine($"Compiled Firely fhirpath: {sw.ElapsedMilliseconds}ms");
 
             sw.Restart();
             for (int i = 0; i < count; i++)
-                eval(pat);
+                eval(patTE);
             sw.Stop();
             Console.WriteLine($"Brian's Linq compiled fhirpath: {sw.ElapsedMilliseconds}ms");
         }
@@ -202,43 +221,54 @@ namespace Test.FhirMappingLanguage
         {
             if (input is global::Hl7.FhirPath.Expressions.ConstantExpression ce)
             {
-                return Expression.Constant(ce.Value);
+                return Expression.Constant(ElementNode.ForPrimitive(ce.Value), typeof(ITypedElement));
             }
             if (input is global::Hl7.FhirPath.Expressions.FunctionCallExpression func)
             {
                 var focus = RemapITypedElement(func.Focus, context);
-                switch (func)
-                {
-                    case ChildExpression:
-                        break;
-                }
                 if (func is global::Hl7.FhirPath.Expressions.ChildExpression child)
                 {
-                    if (ClassMapping.TryGetMappingForType(focus.Type, FhirRelease.R4B, out var cm))
+                    System.Diagnostics.Trace.WriteLine($"    seeking {child.ChildName}");
+                    var mi = typeof(ITypedElement).GetMethod("Children");
+                    if (focus.Type == typeof(ITypedElement))
                     {
-                        // System.Diagnostics.Trace.WriteLine($"{cm.Name} seeking {child.ChildName}");
-                        var n = cm.FindMappedElementByName(child.ChildName);
-                        if (n != null)
-                        {
-                            // System.Diagnostics.Trace.WriteLine($"{n.Name} at {n.NativeProperty.Name}");
-                            return Expression.PropertyOrField(focus, n.NativeProperty.Name);
-                        }
+                        return Expression.Call(focus, mi, Expression.Constant(child.ChildName));
                     }
+                    // Need to handle the collection
+                    var miSelectMany = typeof(System.Linq.Enumerable).GetMethods().Where(m => m.Name == "SelectMany").First();
+                    miSelectMany = miSelectMany.MakeGenericMethod(typeof(ITypedElement), typeof(ITypedElement));
+
+                    var contextVar = Expression.Variable(typeof(ITypedElement), "val");
+                    var exp = Expression.Lambda(Expression.Call(contextVar, mi, Expression.Constant(child.ChildName)), contextVar);
+                    return Expression.Call(miSelectMany, focus, exp);
+
+                    Expression<Func<IEnumerable<ITypedElement>, string, IEnumerable<ITypedElement>>> predicate = (te, childName) => te.SelectMany(s => s.Children(childName));
+                    return Expression.Invoke(predicate, focus, Expression.Constant(child.ChildName));
                 }
                 if (input is global::Hl7.FhirPath.Expressions.IndexerExpression ie)
                 {
-                    if (focus.Type.IsArray)
-                        return Expression.ArrayIndex(focus, RemapITypedElement(ie.Index, focus));
-                    var mi = focus.Type.GetMethod("get_Item");
-                    if (mi != null)
-                        return Expression.Call(focus, mi, RemapITypedElement(ie.Index, focus));
-                    // There was no item getter function, so check if there is an iterator, then use the linq Skip().first()
-                    mi = focus.Type.GetMethod("GetEnumerator");
-                    if (mi != null)
-                        return Expression.Call(focus, mi, RemapITypedElement(ie.Index, focus));
+                    Expression index;
+                    int? rawValue = null;
+                    if (ie.Index is global::Hl7.FhirPath.Expressions.ConstantExpression ce2)
+                    {
+                        index = Expression.Constant(ce2.Value);
+                        rawValue = (int)ce2.Value;
+                    }
+                    else
+                        index = Expression.Convert(Expression.PropertyOrField(RemapITypedElement(ie.Index, focus), "value"), typeof(Int32));
+                    var miSkip = typeof(System.Linq.Enumerable).GetMethods().Where(m => m.Name == "Skip").First();
+                    miSkip = miSkip.MakeGenericMethod(typeof(ITypedElement));
+                    var miTake = typeof(System.Linq.Enumerable).GetMethods().Where(m => m.Name == "Take").First();
+                    miTake = miTake.MakeGenericMethod(typeof(ITypedElement));
+                    if (rawValue == 0)
+                        return Expression.Call(miTake, focus, Expression.Constant(1));
+                    return Expression.Call(miTake, Expression.Call(miSkip, focus, index), Expression.Constant(1));
+
+                    // Expression<Func<IEnumerable<ITypedElement>, int, IEnumerable<ITypedElement>>> predicate = (te, index) => te.Skip(index).Take(1);
+                    // return Expression.Invoke(predicate, focus, index);
                     // otherwise let it fall through
-                    System.Diagnostics.Trace.WriteLine($"Cannot handle indexer on {focus.Type.Name}");
-                    return null;
+                    // System.Diagnostics.Trace.WriteLine($"Cannot handle indexer on {focus.Type.Name}");
+                    // return null;
                 }
             }
             if (input is global::Hl7.FhirPath.Expressions.AxisExpression ae)
@@ -334,11 +364,11 @@ namespace Test.FhirMappingLanguage
                     {
                         // this type can be selected over
                         // public static IEnumerable<TSource> Where<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> predicate);
-                        var mi = typeof(System.Linq.Enumerable).GetMethods().Where(m => m.Name == "SelectMany").First();
-                        mi = mi.MakeGenericMethod(focus.Type, resultExpr.Type.GenericTypeArguments.FirstOrDefault() ?? resultExpr.Type);
+                        var miSelectMany = typeof(System.Linq.Enumerable).GetMethods().Where(m => m.Name == "SelectMany").First();
+                        miSelectMany = miSelectMany.MakeGenericMethod(focus.Type, resultExpr.Type.GenericTypeArguments.FirstOrDefault() ?? resultExpr.Type);
 
                         var exp = Expression.Lambda(resultExpr, focus as ParameterExpression);
-                        return Expression.Call(mi, realFocus, exp);
+                        return Expression.Call(miSelectMany, realFocus, exp);
                     }
                     return resultExpr;
                 }
