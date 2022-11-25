@@ -1,6 +1,8 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification;
+using Hl7.Fhir.Specification.Source;
+using Hl7.Fhir.Support;
 using ICSharpCode.SharpZipLib.Tar;
 using Microsoft.VisualStudio.TestPlatform.PlatformAbstractions.Interfaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -9,7 +11,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Test.Hl7.Fhir.MappingLanguage
 {
@@ -21,10 +22,14 @@ namespace Test.Hl7.Fhir.MappingLanguage
         public List<string> Columns { get; private set; } = new List<string>();
         public string rawHeader;
         TextReader _reader;
+        string _canonicalUrl;
+        string _typeName;
 
-        public CsvReader(TextReader reader)
+        public CsvReader(TextReader reader, string canonicalUrl = null, string typeName = null)
         {
             _reader = reader;
+            _canonicalUrl = canonicalUrl;
+            _typeName = typeName;
         }
 
         public IEnumerable<string> ParseHeader()
@@ -115,95 +120,50 @@ namespace Test.Hl7.Fhir.MappingLanguage
             var tes = fields.Select((f, i) => SourceNode.Valued(Columns[i], f));
             var sn = SourceNode.Node("Entry", tes.ToArray());
             if (_provider == null)
-                _provider = new CsvHackedSummaryProvider(Columns);
-            return sn.ToTypedElement();
-            // return sn.ToTypedElement(_provider, "Entry");
-        }
-        CsvHackedSummaryProvider _provider;
-
-        public class CsvHackedSummaryProvider : IStructureDefinitionSummaryProvider
-        {
-            public CsvHackedSummaryProvider(IEnumerable<string> fields)
             {
-                _fields = fields;
+                var source = new InMemoryProvider(GenerateStructureDefinition());
+                _provider = new StructureDefinitionSummaryProvider(new CachedResolver(new MultiResolver(source, ZipSource.CreateValidationSource())), source.TypeNameMapper);
             }
-            IEnumerable<string> _fields;
-
-            public IStructureDefinitionSummary Provide(string canonical)
-            {
-                Console.WriteLine(canonical);
-                return new CsvHackedStructureDefinitionSummary(_fields);
-            }
+            // return sn.ToTypedElement();
+            return sn.ToTypedElement(_provider, "Entry");
         }
 
-        public class CsvHackedStructureDefinitionSummary : IStructureDefinitionSummary
+        IStructureDefinitionSummaryProvider _provider;
+
+        public StructureDefinition GenerateStructureDefinition()
         {
-            public CsvHackedStructureDefinitionSummary(IEnumerable<string> fields)
+            var result = new StructureDefinition()
             {
-                _fields = fields;
-            }
-            IEnumerable<string> _fields;
-
-            public string TypeName => "Entry";
-
-            public bool IsAbstract => false;
-
-            public bool IsResource => true;
-
-            public IReadOnlyCollection<IElementDefinitionSummary> GetElements()
+                Description = new Markdown(),
+                Url = _canonicalUrl,
+                Title = _typeName,
+                Name = _typeName,
+                Status = PublicationStatus.Draft,
+                Date = DateTime.Today.ToFhirDate(),
+                Publisher = "Code Generated - CSV Reader",
+                Kind = StructureDefinition.StructureDefinitionKind.Logical,
+                Abstract = false,
+                Type = _typeName,
+                Derivation = StructureDefinition.TypeDerivationRule.Specialization,
+                BaseDefinition = "http://hl7.org/fhir/StructureDefinition/Element",
+                Snapshot = new StructureDefinition.SnapshotComponent()
+            };
+            result.Snapshot.Element.Add(new ElementDefinition()
             {
-                return _fields.Select((f, i) => new CvsItemElementDefinitionSummary(f, i)).ToList();
-            }
-        }
-
-        public class CvsItemElementDefinitionSummary : IElementDefinitionSummary
-        {
-            public CvsItemElementDefinitionSummary(string fieldName, int position)
+                Path = _typeName,
+                Label = _typeName,
+                Min = 0,
+                Max = "*"
+            });
+            result.Snapshot.Element.AddRange(Columns.Select(c => new ElementDefinition()
             {
-                _field = fieldName;
-                _position = position;
-            }
-
-            string _field;
-            int _position;
-
-            public string ElementName => _field;
-
-            public bool IsCollection => false;
-
-            public bool IsRequired => false;
-
-            public bool InSummary => true;
-
-            public bool IsChoiceElement => false;
-
-            public bool IsResource => false;
-
-            public bool IsModifier => false;
-
-            public ITypeSerializationInfo[] Type => new[] { new CsvElementSerialization() };
-
-            public string DefaultTypeName => "string";
-
-            public string NonDefaultNamespace => null;
-
-            public XmlRepresentation Representation => XmlRepresentation.XmlElement;
-
-            public int Order => _position;
-        }
-
-        public class CsvElementSerialization : IStructureDefinitionSummary
-        {
-            public string TypeName => "string";
-            
-            public bool IsAbstract => false;
-
-            public bool IsResource => false;
-
-            public IReadOnlyCollection<IElementDefinitionSummary> GetElements()
-            {
-                return new List<IElementDefinitionSummary>();
-            }
+                Path = $"{_typeName}.{c}",
+                Label = c,
+                Min = 0,
+                Max = "1",
+                Type = new[] { new ElementDefinition.TypeRefComponent() { Code = "string" } }.ToList()
+            }));
+            return result;
         }
     }
 }

@@ -115,28 +115,34 @@ namespace Test.FhirMappingLanguage
             }
         }
 
-        //[TestMethod]
-        //public void ScanCsvFile()
-        //{
-        //    using (var stream = File.OpenRead("C:\\temp\\Loinc_2.73\\LoincTable\\Loinc.csv"))
-        //    // using (var stream = File.OpenRead("E:\\git\\HL7\\fhir-core-build-r5-PA\\source\\endpoint\\endpoint-examples-general-template.csv"))
-        //    using (var sr = new StreamReader(stream))
-        //    {
-        //        CsvReader reader = new CsvReader(sr);
-        //        reader.ParseHeader();
-        //        Console.WriteLine($">{reader.rawHeader}<");
-        //        var node = reader.GetNextEntry();
-        //        int count = 0;
-        //        while (node != null)
-        //        {
-        //            count++;
-        //             Console.WriteLine($"{node.Children("LOINC_NUM").First().Value}\t{node.Children("COMPONENT").First().Value}");
-        //            // node.ToXml();
-        //            node = reader.GetNextEntry();
-        //        }
-        //        Console.WriteLine($"Total Rows: {count}");
-        //    }
-        //}
+        [TestMethod]
+        public void ScanCsvFile()
+        {
+            // LOINC is available here https://loinc.org/downloads/
+            using (var stream = File.OpenRead("C:\\temp\\Loinc_2.73\\LoincTable\\Loinc.csv"))
+            // using (var stream = File.OpenRead("E:\\git\\HL7\\fhir-core-build-r5-PA\\source\\endpoint\\endpoint-examples-general-template.csv"))
+            using (var sr = new StreamReader(stream))
+            {
+                CsvReader reader = new CsvReader(sr, "http://example.org/StructureDefinition/Entry", "Entry");
+                reader.ParseHeader();
+                Console.WriteLine($">{reader.rawHeader}<");
+                var node = reader.GetNextEntry();
+                int count = 0;
+                while (node != null)
+                {
+                    // if (count > 10) break;
+                    count++;
+                    if (count <= 10)
+                    {
+                        Console.WriteLine($"{node.Children("LOINC_NUM").First().Value}\t{node.Children("COMPONENT").First().Value}");
+                        // Console.WriteLine($"{node.Children("address").First().Value}");
+                        Console.WriteLine(node.ToJson());
+                    }
+                    node = reader.GetNextEntry();
+                }
+                Console.WriteLine($"Total Rows: {count}");
+            }
+        }
 
         //[TestMethod]
         //public void Tutorial_Step1()
