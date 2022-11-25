@@ -6,7 +6,7 @@
 
     <AssemblyName>Hl7.Fhir.R4B.MappingLanguage</AssemblyName>
     <PackageId>brianpos.Fhir.R4B.MappingLanguage</PackageId>
-    <Version>4.3.0-alpha7</Version>
+    <Version>4.3.0-alpha8</Version>
     <Title>HL7 Fhir Mapping Language Engine</Title>
     <Summary>HL7 Fhir Mapping Language Engine ported from the Java code</Summary>
     <Description>Includes a serializer, parser and execution engine</Description>
