@@ -19,7 +19,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
             Add(resource);
         }
 
-        private void Add(IConformanceResource resource)
+        public void Add(IConformanceResource resource)
         {
             _resources.Add(resource.Url, resource);
             if (resource is StructureDefinition sd)

@@ -6,6 +6,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
 using Hl7.Fhir.WebApi;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using System.Net;
 using System.Text;
@@ -88,10 +89,13 @@ namespace demo_map_server
 
         public override void WriteResponseHeaders(OutputFormatterWriteContext context)
         {
-            context.ContentType = FhirMediaType.GetMediaTypeHeaderValue(context.ObjectType, ResourceFormat.Xml);
+            MediaTypeHeaderValue mediaTypeHeaderValue = new MediaTypeHeaderValue("text/fhir-mapping");
+            mediaTypeHeaderValue.Charset = Encoding.UTF8.WebName;
+            context.ContentType = new StringSegment(mediaTypeHeaderValue.ToString());
+
             // note that the base is called last, as this may overwrite the ContentType where the resource is of type Binary
             base.WriteResponseHeaders(context);
-            //   headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "fhir.resource.json" };
+            //   headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "fhir.resource.map" };
         }
 
         protected override bool CanWriteType(Type type)

@@ -1080,7 +1080,7 @@ namespace Hl7.Fhir.MappingLanguage
                             string code = getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString());
                             string display = tgt.Parameter.Count > 2 ? getParamStringNoNull(vars, tgt.Parameter[2], tgt.ToString()) : null;
                             Coding c = buildCoding(system, code, display);
-                        return c.ToTypedElement();
+                            return c.ToTypedElement();
                         }
 
                     default:
