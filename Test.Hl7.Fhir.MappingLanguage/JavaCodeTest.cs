@@ -36,7 +36,7 @@ namespace Test.FhirMappingLanguage
         private void assertSerializeDeserialize(StructureMap structureMap)
         {
             Assert.AreEqual("syntax", structureMap.Name);
-            Assert.AreEqual("Title of this map\r\nAuthor", structureMap.Description?.Value);
+            Assert.AreEqual("Title of this map\r\nAuthor", structureMap.Description);
             Assert.AreEqual("http://github.com/FHIR/fhir-test-cases/r5/fml/syntax", structureMap.Url);
             Assert.AreEqual("Patient", structureMap.Structure[0].Alias);
             Assert.AreEqual("http://hl7.org/fhir/StructureDefinition/Patient", structureMap.Structure[0].Url);

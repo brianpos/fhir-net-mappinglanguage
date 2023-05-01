@@ -82,9 +82,9 @@ namespace Hl7.Fhir.MappingLanguage
             b.Append("\" = \"");
             b.Append(Utilities.escapeJson(map.Name));
             b.Append("\"\r\n\r\n");
-            if (!string.IsNullOrEmpty(map.Description?.Value))
+            if (!string.IsNullOrEmpty(map.Description))
             {
-                renderMultilineDoco(b, map.Description.Value, 0);
+                renderMultilineDoco(b, map.Description, 0);
                 b.Append("\r\n");
             }
             renderConceptMaps(b, map);
