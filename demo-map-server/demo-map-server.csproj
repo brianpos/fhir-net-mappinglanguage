@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
@@ -10,10 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="brianpos.Fhir.R4B.DemoFileSystemFhirServer" Version="5.2.0-beta1" />
-    <PackageReference Include="brianpos.Fhir.R4B.WebApi.AspNetCore" Version="5.2.0-beta1" />
-    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.2.0" />
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.2.0" />
+    <PackageReference Include="brianpos.Fhir.R4B.DemoFileSystemFhirServer" Version="5.3.0-beta1" />
+    <PackageReference Include="brianpos.Fhir.R4B.WebApi.AspNetCore" Version="5.3.0-beta1" />
+    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.3.0" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.3.0" />
   </ItemGroup>
 
   <ItemGroup>
