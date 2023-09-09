@@ -710,7 +710,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 case ExpressionNode.Function.Empty: return checkParamCount(lexer, location, exp, 0);
                 case ExpressionNode.Function.Not: return checkParamCount(lexer, location, exp, 0);
-                case ExpressionNode.Function.Exists: return checkParamCount(lexer, location, exp, 0);
+                case ExpressionNode.Function.Exists: return checkParamCount(lexer, location, exp, 0, 1);
                 case ExpressionNode.Function.SubsetOf: return checkParamCount(lexer, location, exp, 1);
                 case ExpressionNode.Function.SupersetOf: return checkParamCount(lexer, location, exp, 1);
                 case ExpressionNode.Function.IsDistinct: return checkParamCount(lexer, location, exp, 0);
