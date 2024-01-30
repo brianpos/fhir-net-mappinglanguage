@@ -4,7 +4,7 @@ using Hl7.Fhir.Specification.Source;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Test.Hl7.Fhir.MappingLanguage
+namespace Test.FhirMappingLanguage
 {
     public class InMemoryProvider : IAsyncResourceResolver, IResourceResolver
     {

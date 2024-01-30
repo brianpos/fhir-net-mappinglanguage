@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace Test.Hl7.Fhir.MappingLanguage
+namespace Test.FhirMappingLanguage
 {
     /// <summary>
     /// Expression.Equal(left, right, true, null)
