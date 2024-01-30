@@ -351,52 +351,96 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-        private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
+		public static IEnumerable<IEnumerable<T>> CartesianProduct<T>(IEnumerable<IEnumerable<T>> input)
+		{
+			if (!input.Any())
+				return input;
+
+			var result = new List<List<T>>();
+			if (input.Count() == 1)
+            {
+                // return a new list for each element
+                foreach (var item in input.First())
+					result.Add(new List<T>() { item });
+				return result;
+			}
+
+			var left = input.First();
+			var right = CartesianProduct(input.Skip(1));
+
+            if (!left.Any())
+            {
+				// Just return the right side
+				foreach (var r in right)
+					result.Add(new List<T>(r));
+			}
+
+			foreach (var l in left)
+            {
+                if (!right.Any())
+                    result.Add(new List<T>() { l });
+				else foreach (var r in right)
+                    result.Add(new List<T>() { l }.Concat(r).ToList());
+            }
+			return result;
+		}
+
+		private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
             log("debug", () => indent + "rule : " + rule.Name + "; vars = " + vars.summary());
-            Variables srcVars = vars.copy();
-            if (rule.Source.Count() != 1)
-                throw new FHIRException("Rule \"" + rule.Name + "\": not handled yet");
-            List<Variables> source = processSource(rule.Name, context, srcVars, rule.Source.First(), map.Url, indent);
-            if (source != null)
+            if (rule.Source.Count() == 0)
+                throw new FHIRException("Rule \"" + rule.Name + "\": has no sources to execute from");
+			if (rule.Source.Count() > 1)
+				log("debug", () => "Rule \"" + rule.Name + "\": Multiple input sources - generating cartesian product");
+			List<List<Variable>> sourceVariables = new();
+            foreach (var source in rule.Source)
             {
-                foreach (Variables v in source)
+				sourceVariables.Add(processSource(rule.Name, context, vars, source, map.Url, indent));
+            }
+			// https://www.hl7.org/fhir/mapping-language.html#7.8.0.8.1
+			var cartesianProduct = CartesianProduct(sourceVariables);
+
+            foreach (var sourceVars in cartesianProduct)
+            {
+                Variables v = new Variables(vars);
+                foreach (var sv in sourceVars)
                 {
-                    foreach (StructureMap.TargetComponent t in rule.Target)
+                    v.add(sv);
+                }
+                foreach (StructureMap.TargetComponent t in rule.Target)
+                {
+                    processTarget(rule.Name, context, v, map, group, t, rule.Source.Count() == 1 ? rule.getSourceFirstRep().Variable : null, atRoot, vars);
+                }
+                if (rule.Rule.Any())
+                {
+                    foreach (StructureMap.RuleComponent childrule in rule.Rule)
                     {
-                        processTarget(rule.Name, context, v, map, group, t, rule.Source.Count() == 1 ? rule.getSourceFirstRep().Variable : null, atRoot, vars);
+                        executeRule(indent + "  ", context, map, v, group, childrule, false);
                     }
-                    if (rule.Rule.Any())
+                }
+                else if (rule.Dependent.Any())
+                {
+                    foreach (var dependent in rule.Dependent)
                     {
-                        foreach (StructureMap.RuleComponent childrule in rule.Rule)
-                        {
-                            executeRule(indent + "  ", context, map, v, group, childrule, false);
-                        }
+                        executeDependency(indent + "  ", context, map, v, group, dependent);
                     }
-                    else if (rule.Dependent.Any())
-                    {
-                        foreach (var dependent in rule.Dependent)
-                        {
-                            executeDependency(indent + "  ", context, map, v, group, dependent);
-                        }
-                    }
-                    else if (rule.Source.Count() == 1 && !string.IsNullOrEmpty(rule.getSourceFirstRep().Variable)
-                          && rule.Target.Count() == 1 && !string.IsNullOrEmpty(rule.getTargetFirstRep().Variable)
-                          && rule.getTargetFirstRep().Transform == StructureMapTransform.Create
-                          && !rule.getTargetFirstRep().Parameter.Any())
-                    {
-                        // simple inferred, map by type
-                        log("debug", () => v.summary());
-                        ITypedElement src = v.getInputVar(rule.getSourceFirstRep().Variable);
-                        ElementNode tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
-                        string srcType = src.InstanceType;
-                        string tgtType = tgt.InstanceType;
-                        ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
-                        Variables vdef = new Variables();
-                        vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
-                        vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
-                        executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
-                    }
+                }
+                else if (rule.Source.Count() == 1 && !string.IsNullOrEmpty(rule.getSourceFirstRep().Variable)
+                      && rule.Target.Count() == 1 && !string.IsNullOrEmpty(rule.getTargetFirstRep().Variable)
+                      && rule.getTargetFirstRep().Transform == StructureMapTransform.Create
+                      && !rule.getTargetFirstRep().Parameter.Any())
+                {
+                    // simple inferred, map by type
+                    log("debug", () => v.summary());
+                    ITypedElement src = v.getInputVar(rule.getSourceFirstRep().Variable);
+                    ElementNode tgt = v.getOutputVar(rule.getTargetFirstRep().Variable);
+                    string srcType = src.InstanceType;
+                    string tgtType = tgt.InstanceType;
+                    ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
+                    Variables vdef = new Variables();
+                    vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
+                    vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
+                    executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
                 }
             }
         }
@@ -417,7 +461,7 @@ namespace Hl7.Fhir.MappingLanguage
                 string varVal = rdp.Value;
                 VariableMode mode = input.Mode == StructureMap.StructureMapInputMode.Source ? VariableMode.INPUT : VariableMode.OUTPUT;
                 ITypedElement vv = vin.get(mode, varVal);
-                if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenient
+                if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenience
                     vv = vin.getOutputVar(varVal);
                 if (vv == null)
                     throw new FHIRException("Rule '" + dependent.Name + "' " + mode.ToString() + " variable '" + input.Name + "' named as '" + varVal + "' has no value (vars = " + vin.summary() + ")");
@@ -743,7 +787,18 @@ namespace Hl7.Fhir.MappingLanguage
             return res;
         }
 
-        private List<Variables> processSource(string ruleId, TransformContext context, Variables vars, StructureMap.SourceComponent src, string pathForErrors, string indent)
+        /// <summary>
+        /// Calculate a list of the values for this specific source component variable
+        /// </summary>
+        /// <param name="ruleId"></param>
+        /// <param name="context"></param>
+        /// <param name="vars"></param>
+        /// <param name="src"></param>
+        /// <param name="pathForErrors"></param>
+        /// <param name="indent"></param>
+        /// <returns></returns>
+        /// <exception cref="FHIRException"></exception>
+        private List<Variable> processSource(string ruleId, TransformContext context, Variables vars, StructureMap.SourceComponent src, string pathForErrors, string indent)
         {
             List<ITypedElement> items;
             if (src.Context.Equals("@search"))
@@ -871,15 +926,16 @@ namespace Hl7.Fhir.MappingLanguage
                         break;
                 }
             }
-            List<Variables> result = new List<Variables>();
+            List<Variable> result = new List<Variable>();
             foreach (ITypedElement r in items)
             {
-                Variables v = vars.copy();
-                if (!string.IsNullOrEmpty(src.Variable))
-                    v.add(VariableMode.INPUT, src.Variable, r);
-                result.Add(v);
-            }
-            return result;
+                // If there is no source variable, this routine actually does nothing!
+				if (!string.IsNullOrEmpty(src.Variable))
+					result.Add(new Variable(VariableMode.INPUT, src.Variable, r));
+                else
+					result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
+			}
+			return result;
         }
 
 

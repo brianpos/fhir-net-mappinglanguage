@@ -39,6 +39,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.MappingLanguage.TypeDetails;
@@ -229,9 +230,26 @@ namespace Hl7.Fhir.MappingLanguage
             INPUT, OUTPUT, SHARED
         }
 
-        public class Variable
+		[DebuggerDisplay(@"\{{DebuggerDisplay,nq}}")]
+		public class Variable
         {
-            private VariableMode _mode;
+			[DebuggerBrowsable(DebuggerBrowsableState.Never)]
+			public string DebuggerDisplay
+			{
+				get
+				{
+					var sb = new System.Text.StringBuilder();
+					sb.AppendFormat(" Mode=\"{0}\"", Mode);
+					if (!string.IsNullOrEmpty(this.Name))
+						sb.AppendFormat(" Name=\"{0}\"", Name);
+                    if (_object is IFhirValueProvider fvp && fvp.FhirValue != null)
+						sb.AppendFormat(" Value(type)=\"{0}\"", fvp.FhirValue.TypeName);
+
+					return sb.ToString();
+				}
+			}
+
+			private VariableMode _mode;
             private string _name;
             private ITypedElement _object;
             public Variable(VariableMode mode, string name, ITypedElement obj)
@@ -274,9 +292,29 @@ namespace Hl7.Fhir.MappingLanguage
 
         public class Variables
         {
-            private List<Variable> list = new List<Variable>();
+			public Variables()
+            {
+            }
 
-            public IEnumerable<Variable> All() { return list; }
+            public Variables(Variables parent)
+            {
+				_parent = parent;
+			}
+            private Variables _parent;
+
+			private List<Variable> list = new List<Variable>();
+
+            public IEnumerable<Variable> All() 
+            {
+                if (_parent != null)
+                    return _parent.All().Concat(list);
+                return list; 
+            }
+
+            public void add(Variable v)
+            {
+                list.Add(v);
+            }
 
             public void add(VariableMode mode, string name, ITypedElement obj)
             {
@@ -311,6 +349,8 @@ namespace Hl7.Fhir.MappingLanguage
                 foreach (Variable v in list)
                     if ((v.Mode == mode) && v.Name.Equals(name))
                         return v.getObject();
+                if (_parent != null)
+					return _parent.get(mode, name);
                 return null;
             }
 
