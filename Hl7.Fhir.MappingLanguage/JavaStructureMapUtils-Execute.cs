@@ -1021,6 +1021,15 @@ namespace Hl7.Fhir.MappingLanguage
                         string t = getParamString(vars, tgt.Parameter[1]);
                         if (t.Equals("string"))
                             return ElementNode.ForPrimitive(src);
+                        else if (t.Equals("dateTime"))
+                        {
+                            if (FhirDateTime.IsValidValue(src))
+                            {
+                                var castResult = new FhirDateTime(src);
+                                return castResult.ToTypedElement();
+                            }
+                            throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " not yet supported");
+                        }
                         else
                             throw new FHIRException("cast to " + t + " not yet supported");
 
