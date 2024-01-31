@@ -35,6 +35,7 @@
 
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Support;
@@ -1075,19 +1076,108 @@ namespace Hl7.Fhir.MappingLanguage
                         if (tgt.Parameter.Count() == 1)
                             throw new FHIRException("Implicit type parameters on cast not yet supported");
                         string t = getParamString(vars, tgt.Parameter[1]);
-                        if (t.Equals("string"))
-                            return ElementNode.ForPrimitive(src);
-                        else if (t.Equals("dateTime"))
+                        switch (t)
                         {
-                            if (FhirDateTime.IsValidValue(src))
-                            {
-                                var castResult = new FhirDateTime(src);
-                                return castResult.ToTypedElement();
-                            }
-                            throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " not yet supported");
-                        }
-                        else
-                            throw new FHIRException("cast to " + t + " not yet supported");
+							case "boolean":
+								if (!ElementModel.Types.Boolean.TryParse(src, out var parsedBoolean))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new FhirBoolean(parsedBoolean).ToTypedElement();
+
+							case "integer":
+								if (!ElementModel.Types.Integer.TryParse(src, out var parsedInt))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Integer(parsedInt).ToTypedElement();
+
+							case "integer64":
+								if (!ElementModel.Types.Long.TryParse(src, out var parsedInt64))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Integer64(parsedInt64).ToTypedElement();
+
+							case "string": return ElementNode.ForPrimitive(src);
+
+							case "decimal":
+								if (!ElementModel.Types.Decimal.TryParse(src, out var parsedDecimal))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new FhirDecimal(parsedDecimal).ToTypedElement();
+
+							case "uri":
+								if (!FhirUri.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new FhirUri(src).ToTypedElement();
+
+							case "base64Binary":
+								if (!Base64Binary.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Base64Binary(Convert.FromBase64String(src)).ToTypedElement();
+
+							case "instant":
+								if (!Instant.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                DateTimeOffset.TryParse(src, out var parsedInstant);
+								return new Instant(parsedInstant).ToTypedElement();
+
+							case "date":
+								if (!Date.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Date(src).ToTypedElement();
+
+							case "dateTime":
+								if (!FhirDateTime.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new FhirDateTime(src).ToTypedElement();
+
+							case "time":
+								if (!Time.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Time(src).ToTypedElement();
+
+							case "code":
+								if (!Code.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Code(src).ToTypedElement();
+
+							case "oid":
+								if (!Oid.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Oid(src).ToTypedElement();
+
+							case "id":
+								if (!Id.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Id(src).ToTypedElement();
+
+							case "markdown": return new Markdown(src).ToTypedElement();
+
+							case "unsignedInt":
+								if (!ElementModel.Types.Integer.TryParse(src, out var parsedUnsignedInt))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								if (parsedUnsignedInt < 0)
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
+								return new UnsignedInt(parsedUnsignedInt).ToTypedElement();
+
+							case "positiveInt":
+								if (!ElementModel.Types.Integer.TryParse(src, out var parsedPositiveInt))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								if (parsedPositiveInt <= 0)
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
+								return new PositiveInt(parsedPositiveInt).ToTypedElement();
+
+							case "uuid":
+								if (!Uuid.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Uuid(src).ToTypedElement();
+
+							case "url":
+								if (!FhirUrl.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new FhirUrl(src).ToTypedElement();
+
+							case "canonical":
+								if (!Canonical.IsValidValue(src))
+									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+								return new Canonical(src).ToTypedElement();
+						}
+                        throw new FHIRException("cast to " + t + " not yet supported");
 
                     case StructureMap.StructureMapTransform.Append:
                         StringBuilder sb = new StringBuilder(getParamString(vars, tgt.Parameter.First()));
