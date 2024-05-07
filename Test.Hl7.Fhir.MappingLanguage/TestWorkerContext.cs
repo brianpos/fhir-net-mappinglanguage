@@ -18,7 +18,7 @@ namespace Test.FhirMappingLanguage
             _source = source;
             if (!string.IsNullOrEmpty(directoryToAllMaps))
             {
-                foreach (var file in System.IO.Directory.GetFiles(directoryToAllMaps, "*.map"))
+                foreach (var file in System.IO.Directory.GetFiles(directoryToAllMaps, "*.fml"))
                 {
                     var expression = System.IO.File.ReadAllText(file);
                     var parser = new StructureMapUtilitiesParse();

@@ -22,7 +22,7 @@ namespace Test.FhirMappingLanguage
     public class VersionConversionTests
     {
         // From github https://github.com/FHIR/interversion.git
-        const string mappinginterversion_folder = @"c:\git\HL7\interversion";
+        const string mappinginterversion_folder = @"C:\git\hl7\fhir-cross-version\input";
         // const string mappinginterversion_folder = @"e:\git\HL7\interversion";
 
         public VersionConversionTests()
@@ -35,9 +35,11 @@ namespace Test.FhirMappingLanguage
             (_sourceR3 as CachedResolver).Load += Source_Load;
             _sourceR4 = new CachedResolver(cvr.OnlyR4);
             (_sourceR4 as CachedResolver).Load += Source_Load;
-        }
+			_sourceR5 = new CachedResolver(cvr.OnlyR4);
+			(_sourceR5 as CachedResolver).Load += Source_Load;
+		}
 
-        private void Source_Load(object sender, CachedResolver.LoadResourceEventArgs e)
+		private void Source_Load(object sender, CachedResolver.LoadResourceEventArgs e)
         {
             if (e.Resource is IConformanceResource cr)
             {
@@ -48,11 +50,12 @@ namespace Test.FhirMappingLanguage
         IResourceResolver _source;
         IResourceResolver _sourceR3;
         IResourceResolver _sourceR4;
-        FhirXmlSerializationSettings _xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
+		IResourceResolver _sourceR5;
+		FhirXmlSerializationSettings _xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
         FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
 
         [TestMethod]
-        public async Task PrepareStu3CoreStructureDefinitions()
+        public async Task PrepareCoreStructureDefinitions()
         {
             // Download the cross version packages zip file
             // http://fhir.org/packages/xver-packages.zip
@@ -114,7 +117,8 @@ namespace Test.FhirMappingLanguage
             // Instead of modifying the content, have different directory providers
             var v3 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.core", "3.0.2");
             var v4 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r4b.core", "4.3.0");
-            var pc = Firely.Fhir.Packages.PackageClient.Create();
+			var v5 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r5.core", "5.0.0");
+			var pc = Firely.Fhir.Packages.PackageClient.Create();
             var cache = new Firely.Fhir.Packages.DiskPackageCache();
             if (!await cache.IsInstalled(v3))
             {
@@ -126,14 +130,20 @@ namespace Test.FhirMappingLanguage
                 var pkg = await pc.GetPackage(v4);
                 await cache.Install(v4, pkg);
             }
-            DirectorySource stu3 = new DirectorySource(cache.PackageContentFolder(v3));
+			if (!await cache.IsInstalled(v5))
+			{
+				var pkg = await pc.GetPackage(v5);
+				await cache.Install(v5, pkg);
+			}
+			DirectorySource stu3 = new DirectorySource(cache.PackageContentFolder(v3));
             DirectorySource r4 = new DirectorySource(cache.PackageContentFolder(v4));
-        }
+			DirectorySource r5 = new DirectorySource(cache.PackageContentFolder(v5));
+		}
 
-        [TestMethod]
+		[TestMethod]
         public void AnalyzeStructureR3ToR4Map()
         {
-            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\StructureMap.map");
+            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\R3toR4\StructureMap.fml");
             var worker = new TestWorker(_source);
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(mapText, null);
@@ -145,10 +155,10 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void ExecuteStructureR3ToR4Map_Observation()
         {
-            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\r4\R3toR4\Observation.map");
+            var mapText = File.ReadAllText(@$"{mappinginterversion_folder}\R3toR4\Observation.fml");
             var sourceText = File.ReadAllText(@"TestData\observation-example.xml");
             var sourceNode = FhirXmlNode.Parse(sourceText);
-            var worker = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R3toR4");
+            var worker = new TestWorker(_source, @$"{mappinginterversion_folder}\R3toR4");
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(mapText, null);
 
@@ -194,7 +204,7 @@ namespace Test.FhirMappingLanguage
             var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
             var worker = new TestWorker(_source);
             var analyzer = new StructureMapUtilitiesAnalyze(worker);
-            foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", SearchOption.AllDirectories))
+            foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\R3toR4", "*.fml", SearchOption.AllDirectories))
             {
                 System.Diagnostics.Trace.WriteLine("-----------------------");
                 System.Diagnostics.Trace.WriteLine(filename);
@@ -220,41 +230,65 @@ namespace Test.FhirMappingLanguage
                 }
             }
         }
-        [TestMethod]
-        public void ParseAllR3toR4Maps()
-        {
-            var parser = new StructureMapUtilitiesParse();
-            var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
-            foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\r4\R3toR4", "*.map", SearchOption.AllDirectories))
-            {
-                System.Diagnostics.Trace.WriteLine("-----------------------");
-                System.Diagnostics.Trace.WriteLine(filename);
-                var mapText = File.ReadAllText(filename);
-                try
-                {
-                    var sm = parser.parse(mapText, null);
-                    var xml = xs.SerializeToString(sm);
-                    // System.Diagnostics.Trace.WriteLine(xml);
 
-                    var canonicalFml = StructureMapUtilitiesParse.render(sm);
-                    // System.Diagnostics.Trace.WriteLine(canonicalFml);
+		public void ParseAllMaps(string versionMapFolder)
+		{
+			var parser = new StructureMapUtilitiesParse();
+			var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
+			foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\{versionMapFolder}", "*.fml", SearchOption.AllDirectories))
+			{
+				System.Diagnostics.Trace.WriteLine("-----------------------");
+				System.Diagnostics.Trace.WriteLine(filename);
+				var mapText = File.ReadAllText(filename);
+				try
+				{
+					var sm = parser.parse(mapText, null);
+					var xml = xs.SerializeToString(sm);
+					// System.Diagnostics.Trace.WriteLine(xml);
 
-                    var result2 = parser.parse(canonicalFml, null);
-                    var xml2 = xs.SerializeToString(result2);
+					var canonicalFml = StructureMapUtilitiesParse.render(sm);
+					// System.Diagnostics.Trace.WriteLine(canonicalFml);
 
-                    // Assert.IsTrue(sm.IsExactly(result2));
-                }
-                catch (FHIRLexerException ex)
-                {
-                    System.Diagnostics.Trace.WriteLine(ex.Message);
-                }
-            }
-        }
+					var result2 = parser.parse(canonicalFml, null);
+					var xml2 = xs.SerializeToString(result2);
 
-        [TestMethod]
+					// Assert.IsTrue(sm.IsExactly(result2));
+				}
+				catch (FHIRLexerException ex)
+				{
+					System.Diagnostics.Trace.WriteLine(ex.Message);
+				}
+			}
+		}
+
+		[TestMethod]
+		public void ParseAllR3toR4Maps()
+		{
+			ParseAllMaps("R3toR4");
+		}
+
+		[TestMethod]
+		public void ParseAllR4toR5Maps()
+		{
+			ParseAllMaps("R4toR5");
+		}
+
+		[TestMethod]
+		public void ParseAllR4BtoR5Maps()
+		{
+			ParseAllMaps("R4BtoR5");
+		}
+
+		[TestMethod]
+		public void ParseAllR5toR4BMaps()
+		{
+			ParseAllMaps("R5toR4B");
+		}
+
+		[TestMethod]
         public void RoundTripStructureR3toR4Map()
         {
-            var mapText = File.ReadAllText($"{mappinginterversion_folder}\\r4\\R3toR4\\StructureMap.map");
+            var mapText = File.ReadAllText($"{mappinginterversion_folder}\\R3toR4\\StructureMap.fml");
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(mapText, null);
 
@@ -303,8 +337,8 @@ namespace Test.FhirMappingLanguage
             }
 
             // mapper engine parts
-            var workerR3toR4 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R3toR4");
-            var workerR4toR3 = new TestWorker(_source, @$"{mappinginterversion_folder}\r4\R4toR3");
+            var workerR3toR4 = new TestWorker(_source, @$"{mappinginterversion_folder}\R3toR4");
+            var workerR4toR3 = new TestWorker(_source, @$"{mappinginterversion_folder}\R4toR3");
             var parser = new StructureMapUtilitiesParse();
             IStructureDefinitionSummaryProvider providerR4 = new StructureDefinitionSummaryProvider(_sourceR4);
             IStructureDefinitionSummaryProvider providerR3 = new StructureDefinitionSummaryProvider(_sourceR3);
@@ -352,13 +386,13 @@ namespace Test.FhirMappingLanguage
                         try
                         {
                             // Convert up to R4
-                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mappinginterversion_folder}\R3toR4\{sourceNode.Name}.fml"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
 
-                            var mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R3toR4\{sourceNode.Name}.map");
+                            var mapText = File.ReadAllText($@"{mappinginterversion_folder}\R3toR4\{sourceNode.Name}.fml");
                             var sm = parser.parse(mapText, null);
                             var source = engine3to4.GetSourceInput(sm, sourceNode, providerR3);
                             var target = engine3to4.GenerateEmptyTargetOutputStructure(sm);
@@ -378,12 +412,12 @@ namespace Test.FhirMappingLanguage
                             itemResult.resourceConverted++;
 
                             // Convert back down to STU3
-                            if (!File.Exists($@"{mappinginterversion_folder}\r4\R4toR3\{target.Name}.map"))
+                            if (!File.Exists($@"{mappinginterversion_folder}\R4toR3\{target.Name}.fml"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({target.Name}) that has no backward map");
                                 continue;
                             }
-                            mapText = File.ReadAllText($@"{mappinginterversion_folder}\r4\R4toR3\{sourceNode.Name}.map");
+                            mapText = File.ReadAllText($@"{mappinginterversion_folder}\R4toR3\{sourceNode.Name}.fml");
                             sm = parser.parse(mapText, null);
                             var targetR3 = engine4to3.GenerateEmptyTargetOutputStructure(sm);
                             engine4to3.transform(null, target, sm, targetR3);
@@ -429,7 +463,7 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void ConvertAllExamplesR4ToR3()
         {
-            string mapFolder = @$"{mappinginterversion_folder}\r4\R4toR3";
+            string mapFolder = @$"{mappinginterversion_folder}\R4toR3";
             string R4Folder = @"c:\temp\r4-converted";
             string R3Folder = @"c:\temp\r3-converted";
             if (!Directory.Exists(R3Folder))
@@ -470,12 +504,12 @@ namespace Test.FhirMappingLanguage
 
                         try
                         {
-                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.fml"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
-                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
+                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.fml");
                             var sm = parser.parse(mapText, null);
 
                             var target = engine.GenerateEmptyTargetOutputStructure(sm);
@@ -505,7 +539,7 @@ namespace Test.FhirMappingLanguage
         [TestMethod]
         public void ConvertAllExamplesR3ToR4b()
         {
-            string mapFolder = @$"{mappinginterversion_folder}\r4\R3toR4";
+            string mapFolder = @$"{mappinginterversion_folder}\R3toR4";
             string R3Folder = @"c:\temp\r3-converted";
             string R4Folder = @"c:\temp\r4-converted2";
             if (!Directory.Exists(R3Folder))
@@ -546,12 +580,12 @@ namespace Test.FhirMappingLanguage
 
                         try
                         {
-                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.map"))
+                            if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.fml"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");
                                 continue;
                             }
-                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.map");
+                            var mapText = File.ReadAllText($@"{mapFolder}\{sourceNode.Name}.fml");
                             var sm = parser.parse(mapText, null);
 
                             var target = engine.GenerateEmptyTargetOutputStructure(sm);
