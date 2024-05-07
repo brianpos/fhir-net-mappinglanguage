@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Hl7.Fhir.MappingLanguage\Hl7.Fhir.MappingLanguage.csproj" />
+    <ProjectReference Include="..\Hl7.Fhir.MappingLanguage\Hl7.Fhir.MappingLanguage.R4B.csproj" />
   </ItemGroup>
 
 </Project>

@@ -352,54 +352,54 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-		public static IEnumerable<IEnumerable<T>> CartesianProduct<T>(IEnumerable<IEnumerable<T>> input)
-		{
-			if (!input.Any())
-				return input;
+        public static IEnumerable<IEnumerable<T>> CartesianProduct<T>(IEnumerable<IEnumerable<T>> input)
+        {
+            if (!input.Any())
+                return input;
 
-			var result = new List<List<T>>();
-			if (input.Count() == 1)
+            var result = new List<List<T>>();
+            if (input.Count() == 1)
             {
                 // return a new list for each element
                 foreach (var item in input.First())
-					result.Add(new List<T>() { item });
-				return result;
-			}
+                    result.Add(new List<T>() { item });
+                return result;
+            }
 
-			var left = input.First();
-			var right = CartesianProduct(input.Skip(1));
+            var left = input.First();
+            var right = CartesianProduct(input.Skip(1));
 
             if (!left.Any())
             {
-				// Just return the right side
-				foreach (var r in right)
-					result.Add(new List<T>(r));
-			}
+                // Just return the right side
+                foreach (var r in right)
+                    result.Add(new List<T>(r));
+            }
 
-			foreach (var l in left)
+            foreach (var l in left)
             {
                 if (!right.Any())
                     result.Add(new List<T>() { l });
-				else foreach (var r in right)
+                else foreach (var r in right)
                     result.Add(new List<T>() { l }.Concat(r).ToList());
             }
-			return result;
-		}
+            return result;
+        }
 
-		private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
+        private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
             log("debug", () => indent + "rule : " + rule.Name + "; vars = " + vars.summary());
             if (rule.Source.Count() == 0)
                 throw new FHIRException("Rule \"" + rule.Name + "\": has no sources to execute from");
-			if (rule.Source.Count() > 1)
-				log("debug", () => "Rule \"" + rule.Name + "\": Multiple input sources - generating cartesian product");
-			List<List<Variable>> sourceVariables = new();
+            if (rule.Source.Count() > 1)
+                log("debug", () => "Rule \"" + rule.Name + "\": Multiple input sources - generating cartesian product");
+            List<List<Variable>> sourceVariables = new();
             foreach (var source in rule.Source)
             {
-				sourceVariables.Add(processSource(rule.Name, context, vars, source, map.Url, indent));
+                sourceVariables.Add(processSource(rule.Name, context, vars, source, map.Url, indent));
             }
-			// https://www.hl7.org/fhir/mapping-language.html#7.8.0.8.1
-			var cartesianProduct = CartesianProduct(sourceVariables);
+            // https://www.hl7.org/fhir/mapping-language.html#7.8.0.8.1
+            var cartesianProduct = CartesianProduct(sourceVariables);
 
             foreach (var sourceVars in cartesianProduct)
             {
@@ -450,16 +450,26 @@ namespace Hl7.Fhir.MappingLanguage
         {
             ResolvedGroup rg = resolveGroupReference(map, group, dependent.Name);
 
-            if (rg.target.Input.Count != dependent.Variable.Count())
+#if FHIR_R5
+            var variables = dependent.Parameter;
+#else
+            var variables = dependent.VariableElement;
+#endif
+
+            if (rg.target.Input.Count != variables.Count())
             {
-                throw new FHIRException($"Rule '{dependent.Name}' has {rg.target.Input.Count()} but the invocation has {dependent.Variable.Count()} variables");
+                throw new FHIRException($"Rule '{dependent.Name}' has {rg.target.Input.Count()} but the invocation has {variables.Count()} variables");
             }
             Variables v = new Variables();
             for (int i = 0; i < rg.target.Input.Count(); i++)
             {
                 var input = rg.target.Input[i];
-                var rdp = dependent.VariableElement[i];
+                var rdp = variables[i];
+#if FHIR_R5
+                string varVal = (rdp.Value as PrimitiveType)?.ToString();
+#else
                 string varVal = rdp.Value;
+#endif
                 VariableMode mode = input.Mode == StructureMap.StructureMapInputMode.Source ? VariableMode.INPUT : VariableMode.OUTPUT;
                 ITypedElement vv = vin.get(mode, varVal);
                 if (vv == null && mode == VariableMode.INPUT) // once source, always source. but target can be treated as source at user convenience
@@ -646,8 +656,10 @@ namespace Hl7.Fhir.MappingLanguage
 
         private bool matchesByType(StructureMap map, StructureMap.GroupComponent grp, string srcType, string tgtType)
         {
+#if !FHIR_R5
             if (grp.TypeMode == StructureMapGroupTypeMode.None)
                 return false;
+#endif
             if (grp.Input.Count() != 2 || grp.Input.First().Mode != StructureMapInputMode.Source || grp.Input[1].Mode != StructureMapInputMode.Target)
                 return false;
             if (string.IsNullOrEmpty(grp.Input.First().Type) || string.IsNullOrEmpty(grp.Input[1].Type))
@@ -826,7 +838,11 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     getChildrenByName(b, src.Element, items);
                     if (items.Count() == 0 && src.DefaultValue != null)
+#if FHIR_R5
+                        items.Add(src.DefaultValueElement.ToTypedElement());
+#else
                         items.Add(src.DefaultValue.ToTypedElement());
+#endif
                 }
             }
 
@@ -931,12 +947,12 @@ namespace Hl7.Fhir.MappingLanguage
             foreach (ITypedElement r in items)
             {
                 // If there is no source variable, this routine actually does nothing!
-				if (!string.IsNullOrEmpty(src.Variable))
-					result.Add(new Variable(VariableMode.INPUT, src.Variable, r));
+                if (!string.IsNullOrEmpty(src.Variable))
+                    result.Add(new Variable(VariableMode.INPUT, src.Variable, r));
                 else
-					result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
-			}
-			return result;
+                    result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
+            }
+            return result;
         }
 
 
@@ -1078,105 +1094,105 @@ namespace Hl7.Fhir.MappingLanguage
                         string t = getParamString(vars, tgt.Parameter[1]);
                         switch (t)
                         {
-							case "boolean":
-								if (!ElementModel.Types.Boolean.TryParse(src, out var parsedBoolean))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new FhirBoolean(parsedBoolean).ToTypedElement();
+                            case "boolean":
+                                if (!ElementModel.Types.Boolean.TryParse(src, out var parsedBoolean))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new FhirBoolean(parsedBoolean).ToTypedElement();
 
-							case "integer":
-								if (!ElementModel.Types.Integer.TryParse(src, out var parsedInt))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Integer(parsedInt).ToTypedElement();
+                            case "integer":
+                                if (!ElementModel.Types.Integer.TryParse(src, out var parsedInt))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Integer(parsedInt).ToTypedElement();
 
-							case "integer64":
-								if (!ElementModel.Types.Long.TryParse(src, out var parsedInt64))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Integer64(parsedInt64).ToTypedElement();
+                            case "integer64":
+                                if (!ElementModel.Types.Long.TryParse(src, out var parsedInt64))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Integer64(parsedInt64).ToTypedElement();
 
-							case "string": return ElementNode.ForPrimitive(src);
+                            case "string": return ElementNode.ForPrimitive(src);
 
-							case "decimal":
-								if (!ElementModel.Types.Decimal.TryParse(src, out var parsedDecimal))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new FhirDecimal(parsedDecimal).ToTypedElement();
+                            case "decimal":
+                                if (!ElementModel.Types.Decimal.TryParse(src, out var parsedDecimal))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new FhirDecimal(parsedDecimal).ToTypedElement();
 
-							case "uri":
-								if (!FhirUri.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new FhirUri(src).ToTypedElement();
+                            case "uri":
+                                if (!FhirUri.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new FhirUri(src).ToTypedElement();
 
-							case "base64Binary":
-								if (!Base64Binary.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Base64Binary(Convert.FromBase64String(src)).ToTypedElement();
+                            case "base64Binary":
+                                if (!Base64Binary.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Base64Binary(Convert.FromBase64String(src)).ToTypedElement();
 
-							case "instant":
-								if (!Instant.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                            case "instant":
+                                if (!Instant.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
                                 DateTimeOffset.TryParse(src, out var parsedInstant);
-								return new Instant(parsedInstant).ToTypedElement();
+                                return new Instant(parsedInstant).ToTypedElement();
 
-							case "date":
-								if (!Date.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Date(src).ToTypedElement();
+                            case "date":
+                                if (!Date.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Date(src).ToTypedElement();
 
-							case "dateTime":
-								if (!FhirDateTime.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new FhirDateTime(src).ToTypedElement();
+                            case "dateTime":
+                                if (!FhirDateTime.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new FhirDateTime(src).ToTypedElement();
 
-							case "time":
-								if (!Time.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Time(src).ToTypedElement();
+                            case "time":
+                                if (!Time.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Time(src).ToTypedElement();
 
-							case "code":
-								if (!Code.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Code(src).ToTypedElement();
+                            case "code":
+                                if (!Code.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Code(src).ToTypedElement();
 
-							case "oid":
-								if (!Oid.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Oid(src).ToTypedElement();
+                            case "oid":
+                                if (!Oid.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Oid(src).ToTypedElement();
 
-							case "id":
-								if (!Id.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Id(src).ToTypedElement();
+                            case "id":
+                                if (!Id.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Id(src).ToTypedElement();
 
-							case "markdown": return new Markdown(src).ToTypedElement();
+                            case "markdown": return new Markdown(src).ToTypedElement();
 
-							case "unsignedInt":
-								if (!ElementModel.Types.Integer.TryParse(src, out var parsedUnsignedInt))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								if (parsedUnsignedInt < 0)
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
-								return new UnsignedInt(parsedUnsignedInt).ToTypedElement();
+                            case "unsignedInt":
+                                if (!ElementModel.Types.Integer.TryParse(src, out var parsedUnsignedInt))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                if (parsedUnsignedInt < 0)
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
+                                return new UnsignedInt(parsedUnsignedInt).ToTypedElement();
 
-							case "positiveInt":
-								if (!ElementModel.Types.Integer.TryParse(src, out var parsedPositiveInt))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								if (parsedPositiveInt <= 0)
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
-								return new PositiveInt(parsedPositiveInt).ToTypedElement();
+                            case "positiveInt":
+                                if (!ElementModel.Types.Integer.TryParse(src, out var parsedPositiveInt))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                if (parsedPositiveInt <= 0)
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format (cannot be negative)");
+                                return new PositiveInt(parsedPositiveInt).ToTypedElement();
 
-							case "uuid":
-								if (!Uuid.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Uuid(src).ToTypedElement();
+                            case "uuid":
+                                if (!Uuid.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Uuid(src).ToTypedElement();
 
-							case "url":
-								if (!FhirUrl.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new FhirUrl(src).ToTypedElement();
+                            case "url":
+                                if (!FhirUrl.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new FhirUrl(src).ToTypedElement();
 
-							case "canonical":
-								if (!Canonical.IsValidValue(src))
-									throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
-								return new Canonical(src).ToTypedElement();
-						}
+                            case "canonical":
+                                if (!Canonical.IsValidValue(src))
+                                    throw new FHIRException("src value '" + src + "' cannot be cast to " + t + " invalid format");
+                                return new Canonical(src).ToTypedElement();
+                        }
                         throw new FHIRException("cast to " + t + " not yet supported");
 
                     case StructureMap.StructureMapTransform.Append:
@@ -1449,8 +1465,13 @@ namespace Hl7.Fhir.MappingLanguage
                     {
                         foreach (var tgt in list.First().comp.Target)
                         {
+#if FHIR_R5
+                            var equivalentTargets = new[] { ConceptMap.ConceptMapRelationship.RelatedTo, ConceptMap.ConceptMapRelationship.Equivalent, ConceptMap.ConceptMapRelationship.SourceIsNarrowerThanTarget };
+                            if (!tgt.Relationship.HasValue || equivalentTargets.Contains(tgt.Relationship.Value))
+#else
                             var equivalentTargets = new[] { ConceptMapEquivalence.Equal, ConceptMapEquivalence.Relatedto, ConceptMapEquivalence.Equivalent, ConceptMapEquivalence.Wider };
                             if (!tgt.Equivalence.HasValue || equivalentTargets.Contains(tgt.Equivalence.Value))
+#endif
                             {
                                 if (done)
                                 {
@@ -1463,10 +1484,12 @@ namespace Hl7.Fhir.MappingLanguage
                                     outcome = new Coding(list.First().group.Target, tgt.Code);
                                 }
                             }
+#if !FHIR_R5
                             else if (tgt.Equivalence == ConceptMapEquivalence.Unmatched)
                             {
                                 done = true;
                             }
+#endif
                         }
                         if (!done)
                             message = "Concept map " + su + " found no usable translation for " + src.Code;

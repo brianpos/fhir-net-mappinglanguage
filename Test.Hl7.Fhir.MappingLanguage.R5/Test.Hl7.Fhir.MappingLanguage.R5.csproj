@@ -16,15 +16,15 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Hl7.Fhir.R4B" Version="5.8.1" />
-    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.8.1" />
-    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4B" Version="5.8.1" />
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.8.1" />
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.8.1" />
+    <PackageReference Include="Hl7.Fhir.Specification.R5" Version="5.8.1" />
+    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R5" Version="5.8.1" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R5" Version="5.8.1" />
     <PackageReference Include="Firely.Fhir.Packages" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Hl7.Fhir.MappingLanguage\Hl7.Fhir.MappingLanguage.R4B.csproj" />
+    <ProjectReference Include="..\Hl7.Fhir.MappingLanguage.R5\Hl7.Fhir.MappingLanguage.R5.csproj" />
   </ItemGroup>
 
   <ItemGroup>

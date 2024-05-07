@@ -29,6 +29,7 @@
 
 // Port from https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r4/src/main/java/org/hl7/fhir/r4/utils/StructureMapUtilities.java
 // (the parse/serialize portions)
+// And also https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r5/src/main/java/org/hl7/fhir/r5/utils/structuremap/StructureMapUtilities.java
 
 // remember group resolution
 // trace - account for which wasn't transformed in the source
@@ -77,11 +78,21 @@ namespace Hl7.Fhir.MappingLanguage
         public static string render(StructureMap map)
         {
             StringBuilder b = new StringBuilder();
+#if FHIR_R5
+            b.AppendLine($"/// url = \"{map.Url}\"");
+            if (!string.IsNullOrEmpty(map.Name))
+                b.AppendLine($"/// name = \"{Utilities.escapeJson(map.Name)}\"");
+#else
             b.Append("map \"");
             b.Append(map.Url);
             b.Append("\" = \"");
             b.Append(Utilities.escapeJson(map.Name));
             b.Append("\"\r\n\r\n");
+#endif
+            if (!string.IsNullOrEmpty(map.Title))
+                b.AppendLine($"/// title = \"{Utilities.escapeJson(map.Title)}\"");
+            if (map.Status.HasValue)
+                b.AppendLine($"/// status = \"{map.Status.GetLiteral()}\"");
             if (!string.IsNullOrEmpty(map.Description))
             {
                 renderMultilineDoco(b, map.Description, 0);
@@ -168,7 +179,11 @@ namespace Hl7.Fhir.MappingLanguage
                         b.Append("\"");
                     }
                     b.Append(" ");
+#if FHIR_R5
+                    var e = ce.getTargetFirstRep().Relationship;
+#else
                     var e = ce.getTargetFirstRep().Equivalence;
+#endif
                     b.Append(e.HasValue ? getChar(e.Value) : "??");
                     b.Append(" ");
                     b.Append(prefixesTgt[cg.Target]);
@@ -189,6 +204,20 @@ namespace Hl7.Fhir.MappingLanguage
             b.Append("}\r\n\r\n");
         }
 
+#if FHIR_R5
+        private static string getChar(ConceptMap.ConceptMapRelationship equivalence)
+        {
+            switch (equivalence)
+            {
+                case ConceptMap.ConceptMapRelationship.RelatedTo: return "-";
+                case ConceptMap.ConceptMapRelationship.Equivalent: return "==";
+                case ConceptMap.ConceptMapRelationship.NotRelatedTo: return "!=";
+                case ConceptMap.ConceptMapRelationship.SourceIsNarrowerThanTarget: return "<=";
+                case ConceptMap.ConceptMapRelationship.SourceIsBroaderThanTarget: return ">=";
+                default: return "??";
+            }
+        }
+#else
         private static string getChar(ConceptMapEquivalence equivalence)
         {
             switch (equivalence)
@@ -206,6 +235,7 @@ namespace Hl7.Fhir.MappingLanguage
                 default: return "??";
             }
         }
+#endif
 
         private static void renderUses(StringBuilder b, StructureMap map)
         {
@@ -366,6 +396,33 @@ namespace Hl7.Fhir.MappingLanguage
                         b.Append(rd.Name);
                         b.Append("(");
                         bool ifirst = true;
+#if FHIR_R5
+                        foreach (var rdp in rd.Parameter)
+                        {
+                            if (ifirst)
+                                ifirst = false;
+                            else
+                                b.Append(", ");
+                            switch (rdp.Value) 
+                            {
+                                case FhirString fs:
+                                    b.Append(fs.Value);
+                                    break;
+                                case Id id:
+                                    b.Append(id.Value);
+                                    break;
+                                case FhirDecimal fd:
+                                    b.Append(fd.Value);
+                                    break;
+                                case Integer fi:
+                                    b.Append(fi.Value);
+                                    break;
+                                default:
+                                    b.Append("error!");
+                                    break;
+                            }
+                        }
+#else
                         foreach (string rdp in rd.Variable)
                         {
                             if (ifirst)
@@ -374,6 +431,7 @@ namespace Hl7.Fhir.MappingLanguage
                                 b.Append(", ");
                             b.Append(rdp);
                         }
+#endif
                         b.Append(")");
                     }
                 }
@@ -616,7 +674,9 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 b.Append(" ");
             }
-            b.Append("// ");
+            b.Append("//");
+            if (!doco.StartsWith('/'))
+                b.Append(" ");
             b.Append(doco.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " "));
         }
 
@@ -627,8 +687,9 @@ namespace Hl7.Fhir.MappingLanguage
             String[] lines = doco.Replace("\r\n", "\n").Split(new[] { '\r', '\n' });
             foreach (String line in lines)
             {
-                for (int i = 0; i < indent; i++)
-                    b.Append(' ');
+                if (!line.StartsWith('/'))
+                    for (int i = 0; i < indent; i++)
+                        b.Append(' ');
                 renderDoco(b, line);
                 b.Append("\r\n");
             }
@@ -779,7 +840,11 @@ namespace Hl7.Fhir.MappingLanguage
                 if (v.Equals("provided"))
                 {
                     if (g.Unmapped == null) g.Unmapped = new ConceptMap.UnmappedComponent();
+#if FHIR_R5
+                    g.Unmapped.Mode = ConceptMap.ConceptMapGroupUnmappedMode.UseSourceCode;
+#else
                     g.Unmapped.Mode = ConceptMap.ConceptMapGroupUnmappedMode.Provided;
+#endif
                 }
                 else
                     throw lexer.error("Only unmapped mode PROVIDED is supported at this time");
@@ -789,8 +854,13 @@ namespace Hl7.Fhir.MappingLanguage
                 string srcs = readPrefix(prefixes, lexer);
                 lexer.token(":");
                 string sc = lexer.getCurrent().StartsWith("\"") ? lexer.readConstant("code") : lexer.take();
-                ConceptMapEquivalence eq = readEquivalence(lexer);
+                var eq = readEquivalence(lexer);
+#if !FHIR_R5
                 string tgts = (eq != ConceptMapEquivalence.Unmatched) ? readPrefix(prefixes, lexer) : "";
+#else
+                string tgts = readPrefix(prefixes, lexer);
+#endif
+
                 ConceptMap.GroupComponent g = getGroup(map, srcs, tgts);
                 var e = new ConceptMap.SourceElementComponent();
                 g.Element.Add(e);
@@ -799,8 +869,12 @@ namespace Hl7.Fhir.MappingLanguage
                     e.Code = lexer.processConstant(e.Code);
                 var tgt = new ConceptMap.TargetElementComponent();
                 e.Target.Add(tgt);
+#if FHIR_R5
+                tgt.Relationship = eq;
+#else
                 tgt.Equivalence = eq;
                 if (tgt.Equivalence != ConceptMapEquivalence.Unmatched)
+#endif
                 {
                     lexer.token(":");
                     tgt.Code = lexer.take();
@@ -841,6 +915,23 @@ namespace Hl7.Fhir.MappingLanguage
             return prefixes[prefix];
         }
 
+#if FHIR_R5
+        private ConceptMap.ConceptMapRelationship readEquivalence(FHIRLexer lexer)
+        {
+            string token = lexer.take();
+            if (token.Equals("-"))
+                return ConceptMap.ConceptMapRelationship.RelatedTo;
+            if (token.Equals("=="))
+                return ConceptMap.ConceptMapRelationship.Equivalent;
+            if (token.Equals("!="))
+                return ConceptMap.ConceptMapRelationship.NotRelatedTo;
+            if (token.Equals("<="))
+                return ConceptMap.ConceptMapRelationship.SourceIsNarrowerThanTarget;
+            if (token.Equals(">="))
+                return ConceptMap.ConceptMapRelationship.SourceIsBroaderThanTarget;
+            throw lexer.error("Unknown equivalence token '" + token + "'");
+        }
+#else
         private ConceptMapEquivalence readEquivalence(FHIRLexer lexer)
         {
             string token = lexer.take();
@@ -866,6 +957,7 @@ namespace Hl7.Fhir.MappingLanguage
                 return ConceptMapEquivalence.Inexact;
             throw lexer.error("Unknown equivalence token '" + token + "'");
         }
+#endif
 
         private void parseUses(StructureMap result, FHIRLexer lexer)
         {
@@ -917,8 +1009,10 @@ namespace Hl7.Fhir.MappingLanguage
                     group.TypeMode = StructureMap.StructureMapGroupTypeMode.Types;
                 }
             }
+#if !FHIR_R5
             else
                 group.TypeMode = StructureMap.StructureMapGroupTypeMode.None;
+#endif
             group.Name = lexer.take();
             if (lexer.hasToken("("))
             {
@@ -939,7 +1033,9 @@ namespace Hl7.Fhir.MappingLanguage
             }
             if (newFmt)
             {
+#if !FHIR_R5
                 group.TypeMode = StructureMap.StructureMapGroupTypeMode.None;
+#endif
                 if (lexer.hasToken("<"))
                 {
                     lexer.token("<");
@@ -1132,13 +1228,31 @@ namespace Hl7.Fhir.MappingLanguage
             bool done = false;
             while (!done)
             {
+#if FHIR_R5
+                ParseParameter(refD, lexer);
+#else
                 refD.VariableElement.Add(new FhirString(lexer.take()));
+#endif
                 done = !lexer.hasToken(",");
                 if (!done)
                     lexer.next();
             }
             lexer.token(")");
         }
+
+#if FHIR_R5
+        private static void ParseParameter(StructureMap.DependentComponent refD, FHIRLexer lexer)
+        {
+            DataType value;
+            if (!lexer.isConstant())
+                value = new Id(lexer.take());
+            else if (lexer.isStringConstant())
+                value = new FhirString(lexer.readConstant("??"));
+            else
+                value = readConstant(lexer.take(), lexer);
+            refD.Parameter.Add(new StructureMap.ParameterComponent() { Value = value });
+        }
+#endif
 
         private void parseSource(StructureMap.RuleComponent rule, FHIRLexer lexer)
         {
@@ -1180,7 +1294,11 @@ namespace Hl7.Fhir.MappingLanguage
             if (lexer.hasToken("default"))
             {
                 lexer.token("default");
+#if FHIR_R5
+                source.DefaultValue = lexer.readConstant("default value");
+#else
                 source.DefaultValue = new FhirString(lexer.readConstant("default value"));
+#endif
             }
             if (Utilities.existsInList(lexer.getCurrent(), "first", "last", "not_first", "not_last", "only_one"))
                 source.ListMode = EnumUtility.ParseLiteral<StructureMap.StructureMapSourceListMode>(lexer.take());
@@ -1239,7 +1357,9 @@ namespace Hl7.Fhir.MappingLanguage
             if (lexer.hasToken("."))
             {
                 target.Context = start;
+#if !FHIR_R5
                 target.ContextType = StructureMap.StructureMapContextType.Variable;
+#endif
                 start = null;
                 lexer.token(".");
                 target.Element = lexer.take();
@@ -1356,7 +1476,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-        private DataType readConstant(string s, FHIRLexer lexer)
+        private static DataType readConstant(string s, FHIRLexer lexer)
         {
             if (s == "true")
                 return new FhirBoolean(true);
