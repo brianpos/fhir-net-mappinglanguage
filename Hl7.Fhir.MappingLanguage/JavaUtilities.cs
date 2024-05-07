@@ -213,5 +213,22 @@ namespace Hl7.Fhir.MappingLanguage
                     res++;
             return res;
         }
+
+        internal static string makeId(string name)
+        {
+            StringBuilder b = new StringBuilder();
+            foreach (char ch in name.ToCharArray())
+            {
+                if (ch >= 'a' && ch <= 'z')
+                    b.Append(ch);
+                else if (ch >= 'A' && ch <= 'Z')
+                    b.Append(ch);
+                else if (ch >= '0' && ch <= '9')
+                    b.Append(ch);
+                else if (ch == '-' || ch == '.')
+                    b.Append(ch);
+            }
+            return b.ToString();
+        }
     }
 }

@@ -898,7 +898,7 @@ namespace Hl7.Fhir.MappingLanguage
 
             if (tgt.Transform == StructureMap.StructureMapTransform.Create)
             {
-                string s = getParamString(vars, tgt.Parameter.First());
+                string s = getParamString(vars, tgt.Parameter.FirstOrDefault());
                 if (ModelInfo.SupportedResources.Contains(s))
                     tw.newResource(tgt.Variable, s);
             }
@@ -1151,7 +1151,7 @@ namespace Hl7.Fhir.MappingLanguage
             switch (tgt.Transform)
             {
                 case StructureMap.StructureMapTransform.Create:
-                    string p = getParamString(vars, tgt.Parameter.First());
+                    string p = getParamString(vars, tgt.Parameter.FirstOrDefault());
                     return new TypeDetails(ExpressionNode.CollectionStatus.SINGLETON, p);
 
                 case StructureMap.StructureMapTransform.Copy:
@@ -1227,7 +1227,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private string getParamString(VariablesForProfiling vars, StructureMap.ParameterComponent parameter)
         {
-            DataType p = parameter.Value;
+            DataType p = parameter?.Value;
             if (p == null || p is Id)
                 return null;
             if (p is PrimitiveType pt)

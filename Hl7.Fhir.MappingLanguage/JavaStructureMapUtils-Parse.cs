@@ -640,12 +640,17 @@ namespace Hl7.Fhir.MappingLanguage
             if (lexer.done())
                 throw lexer.error("Map Input cannot be empty");
             string comments = lexer.getAllComments();
-            lexer.token("map");
             StructureMap result = new StructureMap();
-            result.Url = lexer.readConstant("url");
-            // result.Id = tail(result.Url); (not in java util code in R4b)
-            lexer.token("=");
-            result.Name = lexer.readConstant("name");
+
+            if (lexer.hasToken("map"))
+            {
+                lexer.token("map");
+                result.Url = lexer.readConstant("url");
+                // result.Id = tail(result.Url); (not in java util code in R4b)
+                lexer.token("=");
+                result.Name = lexer.readConstant("name");
+                result.Status = PublicationStatus.Draft;
+            }
             if (!string.IsNullOrEmpty(comments))
             {
                 // TODO: Parse these comments for code comments
@@ -658,20 +663,28 @@ namespace Hl7.Fhir.MappingLanguage
                         // this is likely a metadata set item
                         string prop = line.Substring(2, index - 3).Trim();
                         string value = line.Substring(index + 1).Trim();
+                        if (value.StartsWith('"'))
+                        {
+                            value = value.Trim('"');
+                        }
                         switch (prop.ToLower())
                         {
-                            case "status":
-                                result.Status = EnumUtility.ParseLiteral<PublicationStatus>(value);
+                            case "url":
+                                result.Url = value.TrimEnd();
+                                break;
+
+                            case "name":
+                                result.Name = value.TrimEnd();
                                 break;
 
                             case "title":
                                 result.Title = value;
                                 break;
 
-                            case "name":
-                                // skip this one as it should be read from the name constant prop in the grammar
-                                csb.append(line.TrimEnd());
+                            case "status":
+                                result.Status = EnumUtility.ParseLiteral<PublicationStatus>(value);
                                 break;
+
                             default:
                                 csb.append(line.TrimEnd());
                                 break;
@@ -685,6 +698,14 @@ namespace Hl7.Fhir.MappingLanguage
                 if (!string.IsNullOrEmpty(csb.ToString()))
                     result.Description = new Markdown(csb.ToString());
             }
+            if (string.IsNullOrEmpty(result.Id) && !string.IsNullOrEmpty(result.Name))
+            {
+                result.Id = Utilities.makeId(result.Name);
+            }
+            if (string.IsNullOrEmpty(result.Description) && !string.IsNullOrEmpty(result.Title))
+            {
+                result.Description = new Markdown(result.Title);
+            }
 
             while (lexer.hasToken("conceptmap"))
                 parseConceptMap(result, lexer);
@@ -693,6 +714,9 @@ namespace Hl7.Fhir.MappingLanguage
                 parseUses(result, lexer);
             while (lexer.hasToken("imports"))
                 parseImports(result, lexer);
+
+            while (lexer.hasToken("conceptmap"))
+                parseConceptMap(result, lexer);
 
             while (!lexer.done())
             {
@@ -717,8 +741,10 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void parseConceptMap(StructureMap result, FHIRLexer lexer)
         {
-            lexer.token("conceptmap");
             ConceptMap map = new ConceptMap();
+            var comments = lexer.getComments();
+            map.Description = new Markdown(String.Join("\r\n\r\n", comments));
+            lexer.token("conceptmap");
             string id = lexer.readConstant("map id");
             if (id.StartsWith("#"))
                 throw lexer.error("Concept Map identifier must start with #");
@@ -742,10 +768,12 @@ namespace Hl7.Fhir.MappingLanguage
             }
             while (lexer.hasToken("unmapped"))
             {
+                // var comments = lexer.cloneComments();
                 lexer.token("unmapped");
                 lexer.token("for");
                 string n = readPrefix(prefixes, lexer);
                 ConceptMap.GroupComponent g = getGroup(map, n, null);
+                // g.addFormatComments(comments);
                 lexer.token("=");
                 string v = lexer.take();
                 if (v.Equals("provided"))
@@ -1142,7 +1170,7 @@ namespace Hl7.Fhir.MappingLanguage
                 // type and cardinality
                 lexer.token(":");
                 source.Type = lexer.takeDottedToken();
-                if (!lexer.hasToken("as", "first", "last", "not_first", "not_last", "only_one", "default"))
+                if (Utilities.isInteger(lexer.getCurrent()))
                 {
                     source.Min = lexer.takeInt();
                     lexer.token("..");
