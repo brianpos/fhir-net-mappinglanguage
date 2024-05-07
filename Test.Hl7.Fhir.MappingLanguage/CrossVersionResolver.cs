@@ -170,22 +170,32 @@ namespace Test.Hl7.Fhir.MappingLanguage
 
         public static string ConvertCanonical(string uri)
         {
-            // convert this from the old format into the versioned format
-            // http://hl7.org/fhir/3.0/StructureDefinition/Account
-            // =>
-            // http://hl7.org/fhir/StructureDefinition/Account|3.0
-            // http://hl7.org/fhir/StructureDefinition/Account|3.0.1
-            // http://hl7.org/fhir/StructureDefinition/Account|4.0.1
-            // i.e. https://github.com/microsoft/fhir-codegen/blob/dev/src/Microsoft.Health.Fhir.SpecManager/Manager/FhirPackageCommon.cs#L513
-            int index = uri.IndexOf("/StructureDefinition/");
-            if (uri.StartsWith(fhirBaseCanonical) && index > fhirBaseCanonical.Length)
+            if (uri.StartsWith(fhirBaseCanonical))
             {
-                string version = uri.Substring(fhirBaseCanonical.Length, index - fhirBaseCanonical.Length);
+                var remainder = uri.Substring(fhirBaseCanonical.Length);
+                string resourceName;
+                if (remainder.StartsWith("StructureDefinition/"))
+                    remainder = remainder.Substring("StructureDefinition/".Length);
+                if (!remainder.Contains("/"))
+                    return uri;
+                resourceName = remainder.Substring(remainder.IndexOf("/")+1);
+				remainder = remainder.Substring(0, remainder.IndexOf("/"));
+
+				// convert this from the old format into the versioned format
+				// http://hl7.org/fhir/3.0/StructureDefinition/Account
+				// =>
+				// http://hl7.org/fhir/StructureDefinition/Account|3.0
+				// http://hl7.org/fhir/StructureDefinition/Account|3.0.1
+				// http://hl7.org/fhir/StructureDefinition/Account|4.0.1
+				// i.e. https://github.com/microsoft/fhir-codegen/blob/dev/src/Microsoft.Health.Fhir.SpecManager/Manager/FhirPackageCommon.cs#L513
+
+				string version = remainder;
                 switch (version)
                 {
                     case "DSTU2":
                         version = "3.0"; // stub these into the STU3 namespace
                         break;
+                    case "3.0":
                     case "3.0.0":
                     case "3.0.1":
                     case "3.0.2":
@@ -193,23 +203,28 @@ namespace Test.Hl7.Fhir.MappingLanguage
                         version = "3.0";
                         break;
 
-                    case "4.0.0":
+					case "4.0":
+					case "4.0.0":
                     case "4.0.1":
                     case "R4":
                         version = "4.0";
                         break;
 
-                    case "4.3.0":
+					case "4.3":
+					case "4.3.0":
                     case "R4B":
                         version = "4.3";
                         break;
 
-                    case "5.0.0":
+					case "5.0":
+					case "5.0.0":
                     case "R5":
                         version = "5.0";
                         break;
+                    default:
+                        return uri;
                 }
-                return $"{fhirBaseCanonical}StructureDefinition/{uri.Substring(index + 21)}|{version}";
+                return $"{fhirBaseCanonical}StructureDefinition/{resourceName}|{version}";
             }
             return uri;
         }
