@@ -95,7 +95,7 @@ namespace demo_map_server
 
             // note that the base is called last, as this may overwrite the ContentType where the resource is of type Binary
             base.WriteResponseHeaders(context);
-            //   headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "fhir.resource.map" };
+            //   headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "fhir.resource.fml" };
         }
 
         protected override bool CanWriteType(Type type)

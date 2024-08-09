@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hl7.Fhir.R4B" Version="5.8.1" />
-    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.8.1" />
-    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4B" Version="5.8.1" />
+    <PackageReference Include="Hl7.Fhir.R4B" Version="5.9.0" />
+    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.9.0" />
+    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4B" Version="5.9.0" />
   </ItemGroup>
 
   <ItemGroup>

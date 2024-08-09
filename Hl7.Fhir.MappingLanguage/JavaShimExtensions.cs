@@ -184,7 +184,9 @@ namespace Hl7.Fhir.MappingLanguage
                 return new FunctionDetails("encode", 1, 1);
             if (functionName == "decode")
                 return new FunctionDetails("decode", 1, 1);
-            throw new NotImplementedException();
+			if (functionName == "round")
+				return new FunctionDetails("round", 0, 1);
+			throw new NotImplementedException($"Unable to determine parameters for function `{functionName}`");
         }
 
         public Base resolveReference(object appContext, string url)

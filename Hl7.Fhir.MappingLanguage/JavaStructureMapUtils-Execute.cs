@@ -260,6 +260,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             var sourceUrl = GetSourceInputStructure(sm);
             var sd = sourceProvider.Provide(sourceUrl);
+            if (sd == null)
+                return null;
             return sourceNode.ToTypedElement(sourceProvider, sd.TypeName);
         }
 

@@ -1,18 +1,7 @@
-﻿using Hl7.Fhir.Language.Debugging;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
 using Hl7.Fhir.Utility;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Resources;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Test.Hl7.Fhir.MappingLanguage
 {
@@ -138,19 +127,19 @@ namespace Test.Hl7.Fhir.MappingLanguage
             var settingsXml = new FhirXmlParsingSettings() { PermissiveParsing = true };
             var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml };
 
-            string crossVersionPackages = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            string crossVersionPackages = System.IO.Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
                 "FhirMapper");
             if (!System.IO.Directory.Exists(crossVersionPackages))
             {
                 System.Diagnostics.Trace.WriteLine($"Cross Version package cache folder does not exist {crossVersionPackages}");
             }
 
-            stu3 = new DirectorySource(Path.Combine(crossVersionPackages, "r3"), settingsDir);
+            stu3 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r3"), settingsDir);
             // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
             // r4 = new DirectorySource(Path.Combine(crossVersionPackages, "r4"), settingsDir);
             r4 = ZipSource.CreateValidationSource();
-            r5 = new DirectorySource(Path.Combine(crossVersionPackages, "r5"), settingsDir);
+            r5 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r5"), settingsDir);
         }
 
         public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }
@@ -172,13 +161,15 @@ namespace Test.Hl7.Fhir.MappingLanguage
         {
             if (uri.StartsWith(fhirBaseCanonical))
             {
-                var remainder = uri.Substring(fhirBaseCanonical.Length);
-                string resourceName;
-                if (remainder.StartsWith("StructureDefinition/"))
-                    remainder = remainder.Substring("StructureDefinition/".Length);
-                if (!remainder.Contains("/"))
-                    return uri;
-                resourceName = remainder.Substring(remainder.IndexOf("/")+1);
+				var remainder = uri.Substring(fhirBaseCanonical.Length);
+				string resourceName;
+				if (remainder.StartsWith("StructureDefinition/"))
+					remainder = remainder.Substring("StructureDefinition/".Length);
+				if (!remainder.Contains("/"))
+					return uri;
+				resourceName = remainder.Substring(remainder.IndexOf("/") + 1);
+				if (resourceName.StartsWith("StructureDefinition/"))
+					resourceName = resourceName.Substring("StructureDefinition/".Length);
 				remainder = remainder.Substring(0, remainder.IndexOf("/"));
 
 				// convert this from the old format into the versioned format
