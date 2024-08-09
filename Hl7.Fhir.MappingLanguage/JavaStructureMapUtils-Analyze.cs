@@ -38,6 +38,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -278,7 +279,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 if (_object == null)
                     return null;
-                if (ModelInfo.IsPrimitive(_object.InstanceType))
+                if (!string.IsNullOrEmpty(_object.InstanceType) && ModelInfo.IsPrimitive(_object.InstanceType))
                     return _name + ": \"" + _object.Value?.ToString() + '"';
                 string debuggerString = _object.Value?.DebuggerDisplayString();
                 if (!string.IsNullOrEmpty(debuggerString))
@@ -290,8 +291,8 @@ namespace Hl7.Fhir.MappingLanguage
             }
         }
 
-        public class Variables
-        {
+        public class Variables : IDictionary<string, IEnumerable<ITypedElement>>
+		{
 			public Variables()
             {
             }
@@ -304,7 +305,17 @@ namespace Hl7.Fhir.MappingLanguage
 
 			private List<Variable> list = new List<Variable>();
 
-            public IEnumerable<Variable> All() 
+			ICollection<string> IDictionary<string, IEnumerable<ITypedElement>>.Keys => throw new NotImplementedException();
+
+			ICollection<IEnumerable<ITypedElement>> IDictionary<string, IEnumerable<ITypedElement>>.Values => throw new NotImplementedException();
+
+			int ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.Count => throw new NotImplementedException();
+
+			bool ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.IsReadOnly => throw new NotImplementedException();
+
+			IEnumerable<ITypedElement> IDictionary<string, IEnumerable<ITypedElement>>.this[string key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
+			public IEnumerable<Variable> All() 
             {
                 if (_parent != null)
                     return _parent.All().Concat(list);
@@ -314,6 +325,11 @@ namespace Hl7.Fhir.MappingLanguage
             public void add(Variable v)
             {
                 list.Add(v);
+            }
+
+            public void RemoveAll(Predicate<ITypedElement> match)
+            {
+                list.RemoveAll(v => match(v.getObject()));
             }
 
             public void add(VariableMode mode, string name, ITypedElement obj)
@@ -375,7 +391,72 @@ namespace Hl7.Fhir.MappingLanguage
                 return "source variables [" + string.Join(",    ", s) + "],      target variables [" + string.Join(",    ", t) + "],       shared variables [" + string.Join(",    ", sh) + "]";
             }
 
-        }
+			void IDictionary<string, IEnumerable<ITypedElement>>.Add(string key, IEnumerable<ITypedElement> value)
+			{
+				throw new NotImplementedException();
+			}
+
+			public bool ContainsKey(string key)
+			{
+				foreach (Variable v in list)
+					if (v.Name.Equals(key))
+						return true;
+				if (_parent != null)
+					return _parent.ContainsKey(key);
+				return false;
+			}
+
+			bool IDictionary<string, IEnumerable<ITypedElement>>.Remove(string key)
+			{
+				throw new NotImplementedException();
+			}
+
+			bool IDictionary<string, IEnumerable<ITypedElement>>.TryGetValue(string key, out IEnumerable<ITypedElement> value)
+			{
+				throw new NotImplementedException();
+			}
+
+			void ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.Add(KeyValuePair<string, IEnumerable<ITypedElement>> item)
+			{
+				throw new NotImplementedException();
+			}
+
+			void ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.Clear()
+			{
+				throw new NotImplementedException();
+			}
+
+			bool ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.Contains(KeyValuePair<string, IEnumerable<ITypedElement>> item)
+			{
+				throw new NotImplementedException();
+			}
+
+			void ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.CopyTo(KeyValuePair<string, IEnumerable<ITypedElement>>[] array, int arrayIndex)
+			{
+				throw new NotImplementedException();
+			}
+
+			bool ICollection<KeyValuePair<string, IEnumerable<ITypedElement>>>.Remove(KeyValuePair<string, IEnumerable<ITypedElement>> item)
+			{
+				throw new NotImplementedException();
+			}
+
+			IEnumerator<KeyValuePair<string, IEnumerable<ITypedElement>>> IEnumerable<KeyValuePair<string, IEnumerable<ITypedElement>>>.GetEnumerator()
+			{
+				foreach (var variable in All())
+				{
+					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, new []{ variable.getObject() });
+				}
+			}
+
+			IEnumerator IEnumerable.GetEnumerator()
+			{
+				foreach (var variable in All())
+				{
+					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, new[] { variable.getObject() });
+				}
+			}
+		}
 
         public class TransformContext
         {
@@ -440,7 +521,7 @@ namespace Hl7.Fhir.MappingLanguage
                         display = t.Display;
                         break;
                     }
-                    if (code.Equals(t.Display, StringComparison.InvariantCultureIgnoreCase) && !string.IsNullOrEmpty(t.System))
+                    if (code.Equals(t.Display, System.StringComparison.InvariantCultureIgnoreCase) && !string.IsNullOrEmpty(t.System))
                     {
                         system = t.System;
                         display = t.Display;
