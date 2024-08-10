@@ -440,11 +440,19 @@ namespace Hl7.Fhir.MappingLanguage
                     string srcType = src.InstanceType;
                     string tgtType = tgt.InstanceType;
                     ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
+                    if (defGroup != null)
+                    {
                     Variables vdef = new Variables();
                     vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
                     vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
                     executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
                 }
+                    else if (srcType == tgtType)
+                    {
+                        // There's no group to call, and we didn't throw, so the types are the same, just copy
+
+            }
+        }
             }
         }
 
@@ -545,6 +553,7 @@ namespace Hl7.Fhir.MappingLanguage
             return result;
         }
 
+        Dictionary<string, List<StructureMap>> _cacheMapsByUrlTemplate = new ();
         /// <summary>
         /// Find any Maps that match the given template
         /// </summary>
@@ -553,6 +562,9 @@ namespace Hl7.Fhir.MappingLanguage
         /// <exception cref="Exception"></exception>
         private List<StructureMap> findMatchingMaps(string canonicalUrlTemplate)
         {
+            if (_cacheMapsByUrlTemplate.ContainsKey(canonicalUrlTemplate.ToLower()))
+                return _cacheMapsByUrlTemplate[canonicalUrlTemplate.ToLower()];
+
             List<StructureMap> res = new List<StructureMap>();
             if (canonicalUrlTemplate.Contains("*"))
             {
@@ -579,6 +591,7 @@ namespace Hl7.Fhir.MappingLanguage
                 else
                     check.Add(sm.Url);
             }
+			_cacheMapsByUrlTemplate.Add(canonicalUrlTemplate.ToLower(), res);
             return res;
         }
 
@@ -590,8 +603,8 @@ namespace Hl7.Fhir.MappingLanguage
         private ResolvedGroup resolveGroupByTypes(StructureMap map, string ruleid, StructureMap.GroupComponent source, string srcType, string tgtType)
         {
             string kn = "types^" + srcType + "in" + tgtType;
-            if (source.hasUserData(kn))
-                return (ResolvedGroup)source.getUserData(kn);
+            if (map.hasUserData(kn))
+                return (ResolvedGroup)map.getUserData(kn);
 
             ResolvedGroup res = new ResolvedGroup();
             res.targetMap = null;
@@ -611,7 +624,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
             if (res.targetMap != null)
             {
-                source.setUserData(kn, res);
+                map.setUserData(kn, res);
                 return res;
             }
 
@@ -643,6 +656,7 @@ namespace Hl7.Fhir.MappingLanguage
             if (res.target == null)
                 throw new FHIRException("No matches found for rule for '" + srcType + " to " + tgtType + "' from " + map.Url + ", from rule '" + ruleid + "'");
             source.setUserData(kn, res);
+            map.setUserData(kn, res);
             return res;
         }
 
@@ -669,6 +683,7 @@ namespace Hl7.Fhir.MappingLanguage
             return matchesType(map, srcType, grp.Input.First().Type) && matchesType(map, tgtType, grp.Input[1].Type);
         }
 
+        Dictionary<string, string> _cacheCanonicalUrlToStatedType = new Dictionary<string, string>();
         private bool matchesType(StructureMap map, string actualType, string statedType)
         {
             // check the aliases
@@ -676,9 +691,17 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 if (!string.IsNullOrEmpty(imp.Alias) && statedType.Equals(imp.Alias))
                 {
+					if (_cacheCanonicalUrlToStatedType.ContainsKey(imp.Url))
+                    {
+						statedType = _cacheCanonicalUrlToStatedType[imp.Url];
+						break;
+                    }
                     StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
                     if (sd != null)
+                    {
                         statedType = sd.Type;
+                        _cacheCanonicalUrlToStatedType.Add(imp.Url, sd.Type);
+					}
                     else
                     {
                         // failed to find the type
@@ -816,7 +839,7 @@ namespace Hl7.Fhir.MappingLanguage
         private List<Variable> processSource(string ruleId, TransformContext context, Variables vars, StructureMap.SourceComponent src, string pathForErrors, string indent)
         {
             List<ITypedElement> items;
-            if (src.Context.Equals("@search"))
+            if (src.Context.Equals("@search")) // THIS is non spec
             {
                 ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_SEARCH_EXPRESSION);
                 if (expr == null)
@@ -974,7 +997,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (dest == null)
                     throw new FHIRException("Rule \"" + ruleId + "\": target context not known: " + tgt.Context);
                 if (string.IsNullOrEmpty(tgt.Element))
-                    throw new FHIRException("Rule \"" + ruleId + "\": Not supported yet");
+                    throw new FHIRException($"Rule \"{ruleId}\" in group \"{group.Name}\": Not supported yet");
             }
             ITypedElement v = null;
             if (tgt.Transform.HasValue)
