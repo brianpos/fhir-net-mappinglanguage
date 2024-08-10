@@ -539,7 +539,22 @@ namespace Hl7.Fhir.MappingLanguage
                             // Remove any existing values
                             if (me.Children(name).Any())
                             {
-                                Log("prop", () => $"Replacing an existing node at {me.Location}.{name}");
+								// Need to check if the types are ok to use
+								if (!cd.Type.Any(t => t.GetTypeName() == value.InstanceType))
+								{
+									// this type isn't in the list, so we need to perform some type co-ersion
+									if (Property.isPrimitive(value.InstanceType) && cd.Type.Length == 1 && Property.isPrimitive(cd.Type[0].GetTypeName()))
+									{
+										// set the primitive value inside
+                                        var existingValues = en[name];
+                                        existingValues[0].Value = value.Value;
+										Log("prop", () => $"SetProp {me.Location}.{name} with '{existingValues[0].Value}'({existingValues[0].InstanceType}) - replace primitive");
+										return existingValues[0];
+									}
+									Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
+								}
+
+								Log("prop", () => $"Replacing an existing node at {me.Location}.{name}");
                                 en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
                                 return ne;
                             }
@@ -549,7 +564,15 @@ namespace Hl7.Fhir.MappingLanguage
                         if (!cd.Type.Any(t => t.GetTypeName() == value.InstanceType))
                         {
                             // this type isn't in the list, so we need to perform some type co-ersion
-                            Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
+                            if (Property.isPrimitive(value.InstanceType) && cd.Type.Length == 1 && Property.isPrimitive(cd.Type[0].GetTypeName()))
+                            {
+                                var result = makeProperty(en, Log, pkp, name) as ElementNode;
+								// and set the primitive value inside
+								result.Value = value.Value;
+								Log("prop", () => $"SetProp {me.Location}.{name} with '{result.Value}'({result.InstanceType}) - primitive");
+								return result;
+							}
+							Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
                         }
                     }
                 }
