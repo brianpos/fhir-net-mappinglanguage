@@ -16,10 +16,39 @@
     <PackageReference Include="Hl7.Fhir.R4B" Version="5.9.0" />
     <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.9.0" />
     <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4B" Version="5.9.0" />
+
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.9.0">
+      <Aliases>R5</Aliases>
+    </PackageReference>
+    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R5" Version="5.9.0">
+      <Aliases>R5</Aliases>
+    </PackageReference>
+
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4" Version="5.9.0" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.9.0" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R5" Version="5.9.0" GeneratePathProperty="true" ExcludeAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Hl7.Fhir.MappingLanguage\Hl7.Fhir.MappingLanguage.R4B.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- https://blog.dangl.me/archive/accessing-nuget-package-paths-in-your-net-sdk-based-csproj-files/ -->
+    <Content Include="$(PkgHl7_Fhir_Specification_Data_R4)\contentFiles\any\any\specification.zip">
+      <Link>specification.r4.zip</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(PkgHl7_Fhir_Specification_Data_R4B)\contentFiles\any\any\specification.zip">
+      <Link>specification.r4b.zip</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(PkgHl7_Fhir_Specification_Data_R5)\contentFiles\any\any\specification.zip">
+      <Link>specification.r5.zip</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

@@ -30,7 +30,10 @@ namespace VersionConversionTester
         public void log(string category, Func<string> message)
         {
             if (category != "error")
-                return;
+            {
+				// System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+				return;
+            }
             switch (category)
             {
                 case "error":
@@ -46,7 +49,8 @@ namespace VersionConversionTester
                     Console.ForegroundColor = ConsoleColor.White;
                     break;
             }
-            Console.WriteLine($"{category}: {message()}");
+			System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+			Console.WriteLine($"{category}: {message()}");
             Console.ResetColor();
         }
 
@@ -62,6 +66,8 @@ namespace VersionConversionTester
 
         public Coding translate(object appInfo, Coding source, string conceptMapUrl)
         {
+            // TODO: Actually call a terminology translation service!
+            return source;
             throw new NotImplementedException();
         }
     }
