@@ -96,16 +96,25 @@ namespace Hl7.Fhir.MappingLanguage
             return _engine.check(vars, null, null, expr);
         }
 
+		Dictionary<ExpressionNode, CompiledExpression> _cache = new Dictionary<ExpressionNode, CompiledExpression>();
+		
         internal string evaluateToString(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
-            foreach (var variable in vars.All())
+            CompiledExpression exprCompiled;
+			if (_cache.ContainsKey(expr))
             {
-                st.AddVar(variable.Name, variable.getObject());
+				exprCompiled = _cache[expr];
             }
-            FhirPathCompiler fpc = new FhirPathCompiler(st);
-            var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled(data, new FhirEvaluationContext());
+            else
+            {
+				FhirPathCompiler fpc = new FhirPathCompiler();
+				StructureMapUtilitiesExecute.patchVariablesInExpression(expr, vars);
+				exprCompiled = fpc.Compile(expr.ToString());
+                _cache.Add(expr, exprCompiled);
+			}
+			var context = new FhirEvaluationContext();
+			context.Environment = vars;
+			var results = exprCompiled(data, context);
             if (!results.Any())
                 return null;
             if (results.First().Value is string str)
@@ -118,27 +127,41 @@ namespace Hl7.Fhir.MappingLanguage
 
         internal bool evaluateToBoolean(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
-            foreach (var variable in vars.All())
+			CompiledExpression exprCompiled;
+			if (_cache.ContainsKey(expr))
             {
-                st.AddVar(variable.Name, variable.getObject());
+				exprCompiled = _cache[expr];
             }
-            FhirPathCompiler fpc = new FhirPathCompiler(st);
-            var exprCompiled = fpc.Compile(expr.ToString());
-            var result = exprCompiled.Predicate(data, new FhirEvaluationContext());
+			else
+			{
+				FhirPathCompiler fpc = new FhirPathCompiler();
+                StructureMapUtilitiesExecute.patchVariablesInExpression(expr, vars);
+				exprCompiled = fpc.Compile(expr.ToString());
+				_cache.Add(expr, exprCompiled);
+			}
+			var context = new FhirEvaluationContext();
+            context.Environment = vars;
+			var result = exprCompiled.IsTrue(data, context);
             return result;
         }
 
         internal IEnumerable<ITypedElement> evaluate(Variables vars, object value1, object value2, ITypedElement data, ExpressionNode expr)
         {
-            var st = new SymbolTable(FhirPathCompiler.DefaultSymbolTable);
-            foreach (var variable in vars.All())
+			CompiledExpression exprCompiled;
+			if (_cache.ContainsKey(expr))
             {
-                st.AddVar(variable.Name, variable.getObject());
+				exprCompiled = _cache[expr];
             }
-            FhirPathCompiler fpc = new FhirPathCompiler(st);
-            var exprCompiled = fpc.Compile(expr.ToString());
-            var results = exprCompiled(data, new FhirEvaluationContext());
+			else
+			{
+				FhirPathCompiler fpc = new FhirPathCompiler();
+				StructureMapUtilitiesExecute.patchVariablesInExpression(expr, vars);
+				exprCompiled = fpc.Compile(expr.ToString());
+				_cache.Add(expr, exprCompiled);
+			}
+			var context = new FhirEvaluationContext();
+			context.Environment = vars;
+			var results = exprCompiled(data, context);
             return results;
         }
     }
@@ -362,7 +385,6 @@ namespace Hl7.Fhir.MappingLanguage
             result.check();
             return result;
         }
-
 
         private ExpressionNode parseExpression(FHIRLexer lexer, bool proximal)
         {

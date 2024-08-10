@@ -655,7 +655,7 @@ namespace Hl7.Fhir.MappingLanguage
             }
             if (res.target == null)
                 throw new FHIRException("No matches found for rule for '" + srcType + " to " + tgtType + "' from " + map.Url + ", from rule '" + ruleid + "'");
-            source.setUserData(kn, res);
+                }
             map.setUserData(kn, res);
             return res;
         }
@@ -845,6 +845,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (expr == null)
                 {
                     expr = fpe.parse(src.Element);
+					patchVariablesInExpression(expr, vars);
                     src.setUserData(MAP_SEARCH_EXPRESSION, expr);
                 }
                 string search = fpe.evaluateToString(vars, null, null, ElementNode.ForPrimitive(""), expr); // string is a holder of nothing to ensure that variables are processed correctly
@@ -884,19 +885,59 @@ namespace Hl7.Fhir.MappingLanguage
                 items.RemoveAll(r => remove.Contains(r));
             }
 
+			if (src.ListMode.HasValue && items.Any())
+			{
+				switch (src.ListMode)
+				{
+					case StructureMapSourceListMode.First:
+						ITypedElement bt = items.First();
+						items.Clear();
+						items.Add(bt);
+						break;
+					case StructureMapSourceListMode.Not_first:
+						if (items.Count() > 0)
+							items.RemoveAt(0);
+						break;
+					case StructureMapSourceListMode.Last:
+						bt = items[items.Count() - 1];
+						items.Clear();
+						items.Add(bt);
+						break;
+					case StructureMapSourceListMode.Not_last:
+						if (items.Count() > 0)
+							items.RemoveAt(items.Count() - 1);
+						break;
+					case StructureMapSourceListMode.Only_one:
+						if (items.Count() > 1)
+							throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed: the collection has more than one item");
+						break;
+				}
+			}
+
+            Variables varsForSource = new Variables(vars);
+			foreach (ITypedElement r in items)
+			{
+                // If there is no source variable, this routine actually does nothing!
+                if (!string.IsNullOrEmpty(src.Variable))
+                {
+                    var newInputVar = new Variable(VariableMode.INPUT, src.Variable, r);
+                    varsForSource.add(newInputVar);
+				}
+			}
+
             if (!string.IsNullOrEmpty(src.Condition))
             {
                 ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_EXPRESSION);
                 if (expr == null)
                 {
                     expr = fpe.parse(src.Condition);
-                    //        fpe.check(context.appInfo, ??, ??, expr)
+					patchVariablesInExpression(expr, varsForSource);
                     src.setUserData(MAP_WHERE_EXPRESSION, expr);
                 }
                 List<ITypedElement> remove = new List<ITypedElement>();
                 foreach (ITypedElement item in items)
                 {
-                    if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
+                    if (!fpe.evaluateToBoolean(varsForSource, null, null, item, expr))
                     {
                         log("debug", () => indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false");
                         remove.Add(item);
@@ -905,6 +946,7 @@ namespace Hl7.Fhir.MappingLanguage
                         log("debug", () => indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
                 }
                 items.RemoveAll(r => remove.Contains(r));
+                varsForSource.RemoveAll(r => remove.Contains(r));
             }
 
             if (!string.IsNullOrEmpty(src.Check))
@@ -913,13 +955,13 @@ namespace Hl7.Fhir.MappingLanguage
                 if (expr == null)
                 {
                     expr = fpe.parse(src.Check);
-                    //        fpe.check(context.appInfo, ??, ??, expr)
+					patchVariablesInExpression(expr, varsForSource);
                     src.setUserData(MAP_WHERE_CHECK, expr);
                 }
                 List<ITypedElement> remove = new List<ITypedElement>();
                 foreach (ITypedElement item in items)
                 {
-                    if (!fpe.evaluateToBoolean(vars, null, null, item, expr))
+					if (!fpe.evaluateToBoolean(varsForSource, null, null, item, expr))
                         throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed");
                 }
             }
@@ -930,53 +972,30 @@ namespace Hl7.Fhir.MappingLanguage
                 if (expr == null)
                 {
                     expr = fpe.parse(src.LogMessage);
+					patchVariablesInExpression(expr, varsForSource);
                     //        fpe.check(context.appInfo, ??, ??, expr)
                     src.setUserData(MAP_WHERE_LOG, expr);
                 }
                 CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
                 foreach (ITypedElement item in items)
-                    b.appendIfNotNull(fpe.evaluateToString(vars, null, null, item, expr));
+					b.appendIfNotNull(fpe.evaluateToString(varsForSource, null, null, item, expr));
                 if (b.Length() > 0)
                     log("info", () => b.ToString());
             }
 
-            if (src.ListMode.HasValue && items.Any())
-            {
-                switch (src.ListMode)
-                {
-                    case StructureMapSourceListMode.First:
-                        ITypedElement bt = items.First();
-                        items.Clear();
-                        items.Add(bt);
-                        break;
-                    case StructureMapSourceListMode.Not_first:
-                        if (items.Count() > 0)
-                            items.RemoveAt(0);
-                        break;
-                    case StructureMapSourceListMode.Last:
-                        bt = items[items.Count() - 1];
-                        items.Clear();
-                        items.Add(bt);
-                        break;
-                    case StructureMapSourceListMode.Not_last:
-                        if (items.Count() > 0)
-                            items.RemoveAt(items.Count() - 1);
-                        break;
-                    case StructureMapSourceListMode.Only_one:
-                        if (items.Count() > 1)
-                            throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed: the collection has more than one item");
-                        break;
-                }
-            }
             List<Variable> result = new List<Variable>();
             foreach (ITypedElement r in items)
             {
                 // If there is no source variable, this routine actually does nothing!
                 if (!string.IsNullOrEmpty(src.Variable))
-                    result.Add(new Variable(VariableMode.INPUT, src.Variable, r));
+				{
+					var newInputVar = new Variable(VariableMode.INPUT, src.Variable, r);
+					result.Add(newInputVar);
+				}
                 else
                     result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
             }
+
             return result;
         }
 
@@ -1026,6 +1045,33 @@ namespace Hl7.Fhir.MappingLanguage
                 vars.add(VariableMode.OUTPUT, tgt.Variable, v);
         }
 
+		public static void patchVariablesInExpression(ExpressionNode node, Variables vars)
+		{
+			if (node.isProximal() && node.getKind() == ExpressionNode.Kind.Name && !string.IsNullOrEmpty(node.getName()) && !node.getName().StartsWith("%"))
+			{
+				// Check if this name is in the variables
+				if (!string.IsNullOrEmpty(node.getName()) && vars.ContainsKey(node.getName()))
+					node.setName("%" + node.getName());
+			}
+
+			// walk into children
+			var next = node.getOpNext();
+			if (next != null)
+				patchVariablesInExpression(next, vars);
+            var grp = node.getGroup();
+            if (grp != null)
+                patchVariablesInExpression(grp, vars);
+            var inner = node.getInner();
+            if (inner != null)
+                patchVariablesInExpression(inner, vars);
+            if (node.parameterCount() > 0)
+            {
+                foreach (var p in node.getParameters())
+                {
+					patchVariablesInExpression(p, vars);
+				}
+			}
+		}
 
         private ITypedElement runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, ITypedElement dest, string element, string srcVar, bool root)
         {
@@ -1079,15 +1125,13 @@ namespace Hl7.Fhir.MappingLanguage
                                 // This is the "short circuit" format of the fhirpath expression
                                 var expression = getParamStringNoNull(vars, tgt.Parameter[0], tgt.ToString());
                                 expr = fpe.parse(expression);
-                                if (!string.IsNullOrEmpty(expr.getName()) && !expr.getName().StartsWith("%"))
-                                {
-                                    // Check if this name is in the variables
-                                    if (vars.All().Any(v => v.Name == expr.getName()))
-                                        expr.setName("%" + expr.getName());
-                                }
+                                patchVariablesInExpression(expr, vars);
                             }
                             else if (tgt.Parameter.Count == 2)
+                            {
                                 expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
+								patchVariablesInExpression(expr, vars);
+							}
                             tgt.setUserData(MAP_EXPRESSION, expr);
                         }
                         IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);
