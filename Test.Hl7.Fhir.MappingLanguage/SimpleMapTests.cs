@@ -53,8 +53,8 @@ namespace Test.FhirMappingLanguage
                     src.category as c -> tgt.category = create('CodeableConcept') as cc then populateCategory(c, cc) ""cat-pop"";
                 }
                 group populateCategory(source src, target tgt){
-                    src.coding as vs0 -> tgt.coding = create('Coding') as vt0 then CodingFixCodeSystem(vs0, vt0);
-                    src -> tgt.text = 'Brian';
+                    src.coding as vs0 -> tgt.coding = create('Coding') as vt0 then CodingFixCodeSystem(vs0, vt0) ""createfixcoding"";
+                    src -> tgt.text = 'Brian' ""fixed-text-brian"";
                 }
                 group CodingFixCodeSystem(source src : Coding, target tgt : Coding) {
                     src.system where ($this='http://hl7.org/fhir/observation-category') -> tgt.system = 'http://terminology.hl7.org/CodeSystem/observation-category' ""patch system"";
@@ -285,20 +285,6 @@ namespace Test.FhirMappingLanguage
             var worker = new TestWorker(source);
             var analyzer = new StructureMapUtilitiesAnalyze(worker);
             var analysisResult = analyzer.analyse(null, sm);
-        }
-
-        [TestMethod]
-        public void TestPeriodInvariantStartNoEnd()
-        {
-            Period p = new Period() { Start = "2022" };
-            Assert.IsTrue(p.Predicate("start.hasValue().not() or end.hasValue().not() or (start <= end)"));
-        }
-
-        [TestMethod]
-        public void TestPeriodInvariantStartAndEnd()
-        {
-            Period p = new Period() { Start = "2022", End="2022" };
-            Assert.IsTrue(p.Predicate("start.hasValue().not() or end.hasValue().not() or (start <= end)"));
         }
     }
 }

@@ -15,7 +15,7 @@ namespace Test.FhirMappingLanguage
         public void UnitTestFromJavaCore()
         {
             // https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r5/src/test/java/org/hl7/fhir/r5/test/StructureMapUtilitiesTest.java
-            var expression = System.IO.File.ReadAllText("E:\\git\\HL7\\fhir-test-cases\\r5\\structure-mapping\\syntax.map");
+            var expression = System.IO.File.ReadAllText("c:\\git\\HL7\\fhir-test-cases\\r5\\structure-mapping\\syntax.map");
             System.Diagnostics.Trace.WriteLine(expression);
             System.Diagnostics.Trace.WriteLine("--------------------------------");
 

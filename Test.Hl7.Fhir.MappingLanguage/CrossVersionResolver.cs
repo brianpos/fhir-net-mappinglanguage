@@ -1,7 +1,9 @@
-﻿using Hl7.Fhir.Model;
+﻿// extern alias R5;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
 using Hl7.Fhir.Utility;
+using System.IO;
 
 namespace Test.Hl7.Fhir.MappingLanguage
 {
@@ -125,7 +127,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
         {
             var settingsJson = new FhirJsonParsingSettings() { PermissiveParsing = true };
             var settingsXml = new FhirXmlParsingSettings() { PermissiveParsing = true };
-            var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml };
+            var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml, ParserSettings = { AcceptUnknownMembers = true, PermissiveParsing = true, AllowUnrecognizedEnums = true } };
 
             string crossVersionPackages = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
@@ -137,14 +139,14 @@ namespace Test.Hl7.Fhir.MappingLanguage
 
             stu3 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r3"), settingsDir);
             // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
-            // r4 = new DirectorySource(Path.Combine(crossVersionPackages, "r4"), settingsDir);
-            r4 = ZipSource.CreateValidationSource();
-            r5 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r5"), settingsDir);
-        }
+            r4 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"), settingsDir);
+			r4b = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4b.zip"), settingsDir);
+			r5 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"), settingsDir);
+		}
 
-        public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }
+		public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }
         public IResourceResolver OnlyR4 { get { return new VersionFilterResolver("4.0", r4); } }
-        public IResourceResolver OnlyR4B { get { return new VersionFilterResolver("4.3", r4); } }
+        public IResourceResolver OnlyR4B { get { return new VersionFilterResolver("4.3", r4b); } }
         public IResourceResolver OnlyR5 { get { return new VersionFilterResolver("5.0", r5); } }
 
         void CustomExceptionHandler(object source, ExceptionNotification args)
@@ -154,7 +156,9 @@ namespace Test.Hl7.Fhir.MappingLanguage
 
         IResourceResolver stu3;
         IResourceResolver r4;
-        IResourceResolver r5;
+		IResourceResolver r4b;
+		public IResourceResolver r5;
+        public IResourceResolver fallbackResolver;
         const string fhirBaseCanonical = "http://hl7.org/fhir/";
 
         public static string ConvertCanonical(string uri)
@@ -227,10 +231,14 @@ namespace Test.Hl7.Fhir.MappingLanguage
             Resource result;
             if (cu.Version() == "3.0")
                 result = stu3.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
-            else if (cu.Version() == "5.0")
-                result = r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
-            else
-                result = r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+			else if (cu.Version() == "4.0")
+				result = r4.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+			else if (cu.Version() == "4.3")
+                result = r4b.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+			else if (cu.Version() == "5.0")
+				result = r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+			else
+				result = fallbackResolver.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
             if (result == null)
             {
                 System.Diagnostics.Trace.WriteLine($"Failed to resolve: {uri} at [{cu.Version()}] {cu.BaseCanonicalUrl()}");
@@ -244,9 +252,13 @@ namespace Test.Hl7.Fhir.MappingLanguage
             Canonical cu = new Canonical(convertedUrl);
             if (cu.Version() == "3.0")
                 return stu3.ResolveByUri(cu.BaseCanonicalUrl());
-            if (cu.Version() == "5.0")
+			if (cu.Version() == "4.0")
+				return r4.ResolveByUri(cu.BaseCanonicalUrl());
+			if (cu.Version() == "4.3")
+				return r4b.ResolveByUri(cu.BaseCanonicalUrl());
+			if (cu.Version() == "5.0")
                 return r5.ResolveByUri(cu.BaseCanonicalUrl());
-            return r4.ResolveByUri(cu.BaseCanonicalUrl());
+            return fallbackResolver.ResolveByUri(cu.BaseCanonicalUrl());
         }
     }
 }
