@@ -442,17 +442,17 @@ namespace Hl7.Fhir.MappingLanguage
                     ResolvedGroup defGroup = resolveGroupByTypes(map, rule.Name, group, srcType, tgtType);
                     if (defGroup != null)
                     {
-                    Variables vdef = new Variables();
-                    vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
-                    vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
-                    executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
-                }
+                        Variables vdef = new Variables();
+                        vdef.add(VariableMode.INPUT, defGroup.target.Input.First().Name, src);
+                        vdef.add(VariableMode.OUTPUT, defGroup.target.Input[1].Name, tgt);
+                        executeGroup(indent + "  ", context, defGroup.targetMap, vdef, defGroup.target, false);
+                    }
                     else if (srcType == tgtType)
                     {
                         // There's no group to call, and we didn't throw, so the types are the same, just copy
 
-            }
-        }
+                    }
+                }
             }
         }
 
@@ -592,7 +592,7 @@ namespace Hl7.Fhir.MappingLanguage
                     check.Add(sm.Url);
             }
 			_cacheMapsByUrlTemplate.Add(canonicalUrlTemplate.ToLower(), res);
-            return res;
+			return res;
         }
 
         private bool urlMatches(string mask, string url)
@@ -654,8 +654,18 @@ namespace Hl7.Fhir.MappingLanguage
                 }
             }
             if (res.target == null)
-                throw new FHIRException("No matches found for rule for '" + srcType + " to " + tgtType + "' from " + map.Url + ", from rule '" + ruleid + "'");
+            {
+                if (srcType == tgtType)
+                {
+                    // This is the same property, so just clone it
+                    log("warning", () => $"Source/Target are the same so should be able to clone them, however just returned null");
+                    return null;
                 }
+                else
+                {
+                    throw new FHIRException("No matches found for rule for '" + srcType + " to " + tgtType + "' from " + map.Url + ", from rule '" + ruleid + "'");
+                }
+            }
             map.setUserData(kn, res);
             return res;
         }
@@ -696,7 +706,7 @@ namespace Hl7.Fhir.MappingLanguage
 						statedType = _cacheCanonicalUrlToStatedType[imp.Url];
 						break;
                     }
-                    StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
+					StructureDefinition sd = worker.fetchResource<StructureDefinition>(imp.Url);
                     if (sd != null)
                     {
                         statedType = sd.Type;
@@ -846,7 +856,7 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     expr = fpe.parse(src.Element);
 					patchVariablesInExpression(expr, vars);
-                    src.setUserData(MAP_SEARCH_EXPRESSION, expr);
+					src.setUserData(MAP_SEARCH_EXPRESSION, expr);
                 }
                 string search = fpe.evaluateToString(vars, null, null, ElementNode.ForPrimitive(""), expr); // string is a holder of nothing to ensure that variables are processed correctly
                 items = services.performSearch(context.getAppInfo(), search);
@@ -925,14 +935,14 @@ namespace Hl7.Fhir.MappingLanguage
 				}
 			}
 
-            if (!string.IsNullOrEmpty(src.Condition))
+			if (!string.IsNullOrEmpty(src.Condition))
             {
                 ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_EXPRESSION);
                 if (expr == null)
                 {
                     expr = fpe.parse(src.Condition);
 					patchVariablesInExpression(expr, varsForSource);
-                    src.setUserData(MAP_WHERE_EXPRESSION, expr);
+					src.setUserData(MAP_WHERE_EXPRESSION, expr);
                 }
                 List<ITypedElement> remove = new List<ITypedElement>();
                 foreach (ITypedElement item in items)
@@ -949,54 +959,54 @@ namespace Hl7.Fhir.MappingLanguage
                 varsForSource.RemoveAll(r => remove.Contains(r));
             }
 
-            if (!string.IsNullOrEmpty(src.Check))
-            {
-                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_CHECK);
-                if (expr == null)
-                {
-                    expr = fpe.parse(src.Check);
+			if (!string.IsNullOrEmpty(src.Check))
+			{
+				ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_CHECK);
+				if (expr == null)
+				{
+					expr = fpe.parse(src.Check);
 					patchVariablesInExpression(expr, varsForSource);
-                    src.setUserData(MAP_WHERE_CHECK, expr);
-                }
-                List<ITypedElement> remove = new List<ITypedElement>();
-                foreach (ITypedElement item in items)
-                {
+					src.setUserData(MAP_WHERE_CHECK, expr);
+				}
+				List<ITypedElement> remove = new List<ITypedElement>();
+				foreach (ITypedElement item in items)
+				{
 					if (!fpe.evaluateToBoolean(varsForSource, null, null, item, expr))
-                        throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed");
-                }
-            }
+						throw new FHIRException("Rule \"" + ruleId + "\": Check condition failed");
+				}
+			}
 
-            if (!string.IsNullOrEmpty(src.LogMessage))
-            {
-                ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_LOG);
-                if (expr == null)
-                {
-                    expr = fpe.parse(src.LogMessage);
+			if (!string.IsNullOrEmpty(src.LogMessage))
+			{
+				ExpressionNode expr = (ExpressionNode)src.getUserData(MAP_WHERE_LOG);
+				if (expr == null)
+				{
+					expr = fpe.parse(src.LogMessage);
 					patchVariablesInExpression(expr, varsForSource);
-                    //        fpe.check(context.appInfo, ??, ??, expr)
-                    src.setUserData(MAP_WHERE_LOG, expr);
-                }
-                CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-                foreach (ITypedElement item in items)
+					//        fpe.check(context.appInfo, ??, ??, expr)
+					src.setUserData(MAP_WHERE_LOG, expr);
+				}
+				CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+				foreach (ITypedElement item in items)
 					b.appendIfNotNull(fpe.evaluateToString(varsForSource, null, null, item, expr));
-                if (b.Length() > 0)
-                    log("info", () => b.ToString());
-            }
+				if (b.Length() > 0)
+					log("info", () => b.ToString());
+			}
 
-            List<Variable> result = new List<Variable>();
-            foreach (ITypedElement r in items)
-            {
-                // If there is no source variable, this routine actually does nothing!
-                if (!string.IsNullOrEmpty(src.Variable))
+			List<Variable> result = new List<Variable>();
+			foreach (ITypedElement r in items)
+			{
+				// If there is no source variable, this routine actually does nothing!
+				if (!string.IsNullOrEmpty(src.Variable))
 				{
 					var newInputVar = new Variable(VariableMode.INPUT, src.Variable, r);
 					result.Add(newInputVar);
 				}
-                else
-                    result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
-            }
+				else
+					result.Add(new Variable(VariableMode.INPUT, AUTO_VAR_NAME, r));
+			}
 
-            return result;
+			return result;
         }
 
 
@@ -1073,7 +1083,7 @@ namespace Hl7.Fhir.MappingLanguage
 			}
 		}
 
-        private ITypedElement runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, ITypedElement dest, string element, string srcVar, bool root)
+		private ITypedElement runTransform(string ruleId, TransformContext context, StructureMap map, StructureMap.GroupComponent group, StructureMap.TargetComponent tgt, Variables vars, ITypedElement dest, string element, string srcVar, bool root)
         {
             try
             {
@@ -1132,7 +1142,7 @@ namespace Hl7.Fhir.MappingLanguage
                                 expr = fpe.parse(getParamStringNoNull(vars, tgt.Parameter[1], tgt.ToString()));
 								patchVariablesInExpression(expr, vars);
 							}
-                            tgt.setUserData(MAP_EXPRESSION, expr);
+							tgt.setUserData(MAP_EXPRESSION, expr);
                         }
                         IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);
                         if (v.Count() == 0)

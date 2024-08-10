@@ -1254,7 +1254,7 @@ namespace Hl7.Fhir.MappingLanguage
         }
 #endif
 
-        private void parseSource(StructureMap.RuleComponent rule, FHIRLexer lexer)
+		private void parseSource(StructureMap.RuleComponent rule, FHIRLexer lexer)
         {
             var source = new StructureMap.SourceComponent();
             rule.Source.Add(source);
