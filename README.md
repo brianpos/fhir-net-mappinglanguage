@@ -38,7 +38,7 @@ checks of the output trace. (These will be fixed as the project matures)
 If you are on mac or linux or don't have the full Visual Studio and just want to run it from the commandline
 there is a test tool that you can use to run directly.
 ``` bash
-brian@linux-test:fhir-net-mappinglanguage/VersionConversionTester$ dotnet run --project VersionConversionTester.csproj /mnt/c/git/hl7/interversion /mnt/c/temp/examples-json.zip
+brian@linux-test:fhir-net-mappinglanguage/VersionConversionTester$ dotnet run --project VersionConversionTester.csproj /mnt/c/git/hl7/interversion /mnt/c/temp/examples-json.zip R4B R5
 ```
 You can also run this in the visual studio debugger and select the paths via the launchSettings (created one for `e` and `c` drives)
 
