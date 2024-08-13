@@ -2,7 +2,7 @@
   "profiles": {
     "VersionConversionTester-C:": {
       "commandName": "Project",
-      "commandLineArgs": "C:\\git\\hl7\\fhir-cross-version\\input c:\\\\temp\\\\examples-json-r4b.zip c:\\temp\\examples-json-output"
+      "commandLineArgs": "C:\\git\\hl7\\fhir-cross-version\\input c:\\\\temp\\\\examples-json-r4b.zip c:\\temp\\examples-json-output R4B R5"
     },
     "VersionConversionTester-E:": {
       "commandName": "Project",

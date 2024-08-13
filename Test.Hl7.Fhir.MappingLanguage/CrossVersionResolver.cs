@@ -4,6 +4,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification.Source;
 using Hl7.Fhir.Utility;
 using System.IO;
+using System.Reflection;
 
 namespace Test.Hl7.Fhir.MappingLanguage
 {
@@ -137,11 +138,30 @@ namespace Test.Hl7.Fhir.MappingLanguage
                 System.Diagnostics.Trace.WriteLine($"Cross Version package cache folder does not exist {crossVersionPackages}");
             }
 
-            stu3 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r3"), settingsDir);
+            var cacheBaseDir = Path.Combine(Path.GetTempPath(), BuildDefaultCacheDirectoryNameWithoutSdkVersion());
+
+
+			stu3 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r3"), settingsDir);
             // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
-            r4 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"), settingsDir);
-			r4b = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4b.zip"), settingsDir);
-			r5 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"), settingsDir);
+            r4 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"), cacheBaseDir+ "Hl7.Fhir.R4", settingsDir);
+			r4b = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4b.zip"), cacheBaseDir + "Hl7.Fhir.R4B", settingsDir);
+			r5 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"), cacheBaseDir + "Hl7.Fhir.R5", settingsDir);
+		}
+
+		/// <summary>
+		/// Builds a directory name to use as the target of the unzipped data. The name is based
+		/// on the product and version information of the assembly given.
+		/// </summary>
+		/// <param name="satellite">The assembly from which to take product and version information.</param>
+		private static string BuildDefaultCacheDirectoryNameWithoutSdkVersion()
+		{
+            Assembly satellite = typeof(ZipSource).Assembly;
+			var versionInfo = satellite.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+			var productInfo = satellite.GetCustomAttribute<AssemblyProductAttribute>();
+
+			//  var cleanedInformationalVersion = new string(versionInfo!.InformationalVersion.TakeWhile(c => c != '+').ToArray());
+			var cleanedInformationalVersion = versionInfo!.InformationalVersion;
+			return $"FhirArtifactCache-{cleanedInformationalVersion}-";
 		}
 
 		public IResourceResolver OnlyStu3 { get { return new VersionFilterResolver("3.0", stu3); } }

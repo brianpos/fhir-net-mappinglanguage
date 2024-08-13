@@ -491,7 +491,7 @@ namespace Hl7.Fhir.MappingLanguage
             executeGroup(indent + "  ", context, rg.targetMap, v, rg.target, false);
         }
 
-        private string determineTypeFromSourceType(StructureMap map, StructureMap.GroupComponent source, ITypedElement baseV, string[] types)
+        private string determineTypeFromSourceType(string ruleId, StructureMap map, StructureMap.GroupComponent source, ITypedElement baseV, string[] types)
         {
             string type = baseV.InstanceType;
             string kn = "type^" + type;
@@ -511,7 +511,7 @@ namespace Hl7.Fhir.MappingLanguage
                         res.target = grp;
                     }
                     else
-                        throw new FHIRException("Multiple possible matches looking for default rule for '" + type + "'");
+                        throw new FHIRException($"Multiple possible matches looking for default rule for '{type}' from {ruleId} in {source.Name}");
                 }
             }
             if (res.targetMap != null)
@@ -540,14 +540,14 @@ namespace Hl7.Fhir.MappingLanguage
                                     res.target = grp;
                                 }
                                 else
-                                    throw new FHIRException("Multiple possible matches for default rule for '" + type + "' in " + res.targetMap.Url + " (" + res.target.Name + ") and " + impMap.Url + " (" + grp.Name + ")");
+                                        throw new FHIRException("Multiple possible matches for default rule for '" + type + "' in " + res.targetMap.Url + " (" + res.target.Name + ") and " + impMap.Url + $" ({grp.Name} - {ruleId})");
                             }
                         }
                     }
                 }
             }
             if (res.target == null)
-                throw new FHIRException("No matches found for default rule for '" + type + "' from " + map.Url);
+                throw new FHIRException($"No matches found for default rule for '{type}' from {ruleId} in {map.Url}");
             string result = getActualType(res.targetMap, res.target.Input[1].Type); // should be .getType, but R2...
             source.setUserData(kn, result);
             return result;
@@ -1099,7 +1099,7 @@ namespace Hl7.Fhir.MappingLanguage
                                 tn = types[0];
                             else if (srcVar != null)
                             {
-                                tn = determineTypeFromSourceType(map, group, vars.getInputVar(srcVar), types);
+                                tn = determineTypeFromSourceType(ruleId, map, group, vars.getInputVar(srcVar), types);
                             }
                             else
                                 throw new Exception("Cannot determine type implicitly because there is no single input variable");
@@ -1452,17 +1452,25 @@ namespace Hl7.Fhir.MappingLanguage
                 src.Code = coding.Code;
                 src.Display = coding.Display;
             }
-            // TODO: BRIAN what is the typename "CE"
-            //else if ("CE".Equals(source.TypeName))
-            //{
-            //    Base[] b = source.getProperty("codeSystem", true);
-            //    if (b.Length == 1)
-            //        src.System = b[0].primitiveValue();
-            //    b = source.getProperty("code", true);
-            //    if (b.Length == 1)
-            //        src.Code = b[0].primitiveValue();
-            //}
-            else
+            else if (source.InstanceType == "Coding")
+            {
+                // This is the FhirJsonNode
+                var parsedCoding = source.ParseCoding();
+				src.System = parsedCoding.System;
+				src.Code = parsedCoding.Code;
+				src.Display = parsedCoding.Display;
+			}
+			// TODO: BRIAN what is the typename "CE"
+			//else if ("CE".Equals(source.TypeName))
+			//{
+			//    Base[] b = source.getProperty("codeSystem", true);
+			//    if (b.Length == 1)
+			//        src.System = b[0].primitiveValue();
+			//    b = source.getProperty("code", true);
+			//    if (b.Length == 1)
+			//        src.Code = b[0].primitiveValue();
+			//}
+			else
                 throw new FHIRException("Unable to translate source " + source.InstanceType);
 
             string su = conceptMapUrl;
