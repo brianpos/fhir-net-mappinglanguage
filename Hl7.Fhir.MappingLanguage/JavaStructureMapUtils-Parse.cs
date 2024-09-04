@@ -709,7 +709,10 @@ namespace Hl7.Fhir.MappingLanguage
                 result.Url = lexer.readConstant("url");
                 // result.Id = tail(result.Url); (not in java util code in R4b)
                 lexer.token("=");
-                result.Name = lexer.readConstant("name");
+                if (lexer.isStringConstant())
+                    result.Name = lexer.readConstant("name");
+                else
+                    result.Name = lexer.take();
                 result.Status = PublicationStatus.Draft;
             }
             if (!string.IsNullOrEmpty(comments))
