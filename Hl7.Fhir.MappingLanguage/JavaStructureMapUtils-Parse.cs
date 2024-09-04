@@ -675,7 +675,7 @@ namespace Hl7.Fhir.MappingLanguage
                 b.Append(" ");
             }
             b.Append("//");
-            if (!doco.StartsWith('/'))
+            if (!doco.StartsWith("/"))
                 b.Append(" ");
             b.Append(doco.Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " "));
         }
@@ -687,7 +687,7 @@ namespace Hl7.Fhir.MappingLanguage
             String[] lines = doco.Replace("\r\n", "\n").Split(new[] { '\r', '\n' });
             foreach (String line in lines)
             {
-                if (!line.StartsWith('/'))
+                if (!line.StartsWith("/"))
                     for (int i = 0; i < indent; i++)
                         b.Append(' ');
                 renderDoco(b, line);
@@ -724,7 +724,7 @@ namespace Hl7.Fhir.MappingLanguage
                         // this is likely a metadata set item
                         string prop = line.Substring(2, index - 3).Trim();
                         string value = line.Substring(index + 1).Trim();
-                        if (value.StartsWith('"'))
+                        if (value.StartsWith("\""))
                         {
                             value = value.Trim('"');
                         }
