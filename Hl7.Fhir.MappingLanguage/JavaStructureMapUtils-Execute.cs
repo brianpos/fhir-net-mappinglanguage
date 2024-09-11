@@ -1460,6 +1460,17 @@ namespace Hl7.Fhir.MappingLanguage
 				src.Code = parsedCoding.Code;
 				src.Display = parsedCoding.Display;
 			}
+			else if (source.InstanceType == "CodeableConcept")
+			{
+				// This is the FhirJsonNode
+				var parsedCC = source.ParseCodeableConcept();
+                foreach (var parsedCoding in parsedCC.Coding)
+                {
+                    src.System = parsedCoding.System;
+                    src.Code = parsedCoding.Code;
+                    src.Display = parsedCoding.Display;
+			}
+			}
 			// TODO: BRIAN what is the typename "CE"
 			//else if ("CE".Equals(source.TypeName))
 			//{

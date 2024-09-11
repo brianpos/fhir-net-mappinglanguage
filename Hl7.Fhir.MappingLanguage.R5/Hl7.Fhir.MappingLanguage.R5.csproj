@@ -6,7 +6,7 @@
 
     <AssemblyName>Hl7.Fhir.R5.MappingLanguage</AssemblyName>
     <PackageId>brianpos.Fhir.R5.MappingLanguage</PackageId>
-    <Version>5.9.0-beta3</Version>
+    <Version>5.10.0-beta1</Version>
     <Title>HL7 Fhir Mapping Language Engine R5</Title>
     <Summary>HL7 Fhir R5 Mapping Language Engine ported from the Java code</Summary>
     <Description>Includes a serializer, parser and execution engine</Description>
@@ -46,8 +46,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.10.0" />
-    <PackageReference Include="Hl7.Fhir.R5" Version="5.9.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <PackageReference Include="Hl7.Fhir.R5" Version="5.10.0" />
   </ItemGroup>
 
 </Project>
