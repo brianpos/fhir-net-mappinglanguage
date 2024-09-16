@@ -6,6 +6,8 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Collections.Generic;
+using System.IO;
 using System.Xml.Serialization;
 
 namespace Test.FhirMappingLanguage
@@ -97,382 +99,208 @@ namespace Test.FhirMappingLanguage
         }
 
         [TestMethod]
-        public void Tutorial_Step1()
+        public void Tutorial_Step1a()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep1 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step1\map\step1.map");
-            var sm1 = parser.parse(mapStep1, "Step1");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step1\map\step1.xml.new",
-                _xmlSerializer.SerializeToString(sm1));
-
-            var mapStep1b = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step1\map\step1b.map");
-            var sm1b = parser.parse(mapStep1, "Step1");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step1\map\step1b.xml.new",
-                _xmlSerializer.SerializeToString(sm1b));
-
-            var source1 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step1\source\source1.xml");
-            var sourceNode = FhirXmlNode.Parse(source1);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step1\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch(name)
-                    {
-                        case "TLeft1":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left1";
-                            return true;
-                        case "TRight1":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right1";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-            // var ti = provider.Provide("http://hl7.org/fhir/StructureDefinition/tutorial-left1");
-
-            var target = ElementNode.Root(provider, "TRight1");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm1, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
-
-
-            // Now for Step 1b
-            target = ElementNode.Root(provider, "TRight1");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm1b, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
-
+			RunTutorialTest("step1", "step1.map", "source1.xml", "target1a.xml");
         }
 
-        [TestMethod]
+		[TestMethod]
+		public void Tutorial_Step1b()
+		{
+			RunTutorialTest("step1", "step1b.map", "source1.xml", "target1b.xml");
+		}
+
+		[TestMethod]
         public void Tutorial_Step2()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep2 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step2\map\step2.map");
-            var sm2 = parser.parse(mapStep2, "Step2");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step2\map\step2.xml.new",
-                _xmlSerializer.SerializeToString(sm2));
-
-            var source2 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step2\source\source2.xml");
-            var sourceNode = FhirXmlNode.Parse(source2);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step2\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm2, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step2", "step2.map", "source2.xml", "target2.xml");
         }
 
         [TestMethod]
         public void Tutorial_Step3a()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep3a = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\map\step3a.map");
-            var sm3a = parser.parse(mapStep3a, "Step3a");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step3\map\step3a.xml.new",
-                _xmlSerializer.SerializeToString(sm3a));
-
-            var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\source\source3.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm3a, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step3", "step3a.map", "source3.xml", "target3a.xml");
         }
 
         [TestMethod]
         public void Tutorial_Step3b()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep3b = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\map\step3b.map");
-            var sm3b = parser.parse(mapStep3b, "Step3b");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step3\map\step3b.xml.new",
-                _xmlSerializer.SerializeToString(sm3b));
-
-            var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\source\source3.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm3b, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step3", "step3b.map", "source3.xml", "target3b.xml");
         }
 
-        [TestMethod]
+		[TestMethod]
+		public void Tutorial_Step3bmin()
+		{
+			RunTutorialTest("step3", "step3b.map", "source3min.xml", "target3bmin.xml");
+		}
+
+		[TestMethod]
         public void Tutorial_Step3c()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep3c = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\map\step3c.map");
-            var sm3c = parser.parse(mapStep3c, "Step3c");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step3\map\step3c.xml.new",
-                _xmlSerializer.SerializeToString(sm3c));
-
-            var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step3\source\source3.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm3c, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step3", "step3c.map", "source3.xml", "target3c.xml", true);
         }
 
-        [TestMethod]
+		[TestMethod]
+		public void Tutorial_Step4a()
+		{
+			RunTutorialTest("step4", "step4a.map", "source4.xml", "target5a.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step4b()
+		{
+			RunTutorialTest("step4", "step4b.map", "source4.xml", "target4b.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step4b2()
+		{
+			RunTutorialTest("step4", "step4b2.map", "source4.xml", "target4b2.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step4b3()
+		{
+			RunTutorialTest("step4", "step4b3.map", "source4.xml", "target4b3.xml");
+		}
+
+		[TestMethod]
         public void Tutorial_Step5a()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep5 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step5\map\step5.map");
-            var sm5 = parser.parse(mapStep5, "Step5");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step5\map\step5.xml.new",
-                _xmlSerializer.SerializeToString(sm5));
-
-            var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step5\source\source5.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step5\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left-5";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right-5";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm5, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step5", "step5.map", "source5.xml", "target5a.xml");
         }
 
         [TestMethod]
         public void Tutorial_Step5b()
         {
-            var parser = new StructureMapUtilitiesParse();
-            var mapStep5 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step5\map\step5.map");
-            var sm5 = parser.parse(mapStep5, "Step5");
-            System.IO.File.WriteAllText(
-                @$"{mappingtutorial_folder}\maptutorial\step5\map\step5.xml.new",
-                _xmlSerializer.SerializeToString(sm5));
-
-            var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\step5\source\source5b.xml");
-            var sourceNode = FhirXmlNode.Parse(source3);
-
-            var source = new CachedResolver(new MultiResolver(
-               new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step5\logical"),
-               ZipSource.CreateValidationSource()
-               ));
-            source.Load += Source_Load;
-            var worker = new TestWorker(source);
-
-            IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
-                source,
-                (string name, out string canonical) => {
-                    switch (name)
-                    {
-                        case "TLeft":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-left-5";
-                            return true;
-                        case "TRight":
-                            canonical = "http://hl7.org/fhir/StructureDefinition/tutorial-right-5";
-                            return true;
-                    }
-                    return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
-                });
-            var engine = new StructureMapUtilitiesExecute(worker, null, provider);
-
-            var target = ElementNode.Root(provider, "TRight");
-            try
-            {
-                engine.transform(null, sourceNode.ToTypedElement(provider), sm5, target);
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-            var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
-            // var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
-            System.Diagnostics.Trace.WriteLine(xml2);
+			RunTutorialTest("step5", "step5.map", "source5b.xml", "target5b.xml");
         }
-    }
+
+		[TestMethod]
+		public void Tutorial_Step6a()
+		{
+			RunTutorialTest("step6", "step6a.map", "source6.xml", "target6a.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step6b()
+		{
+			RunTutorialTest("step6", "step6b.map", "source6b.xml", "target6b.xml", true);
+		}
+
+		[TestMethod]
+		public void Tutorial_Step6c()
+		{
+			RunTutorialTest("step6", "step6c.map", "source6.xml", "target6c.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step6d()
+		{
+			RunTutorialTest("step6", "step6d.map", "source6.xml", "target6d.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step7a()
+		{
+			RunTutorialTest("step7", "step7.map", "source7.xml", "target7a.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step7b()
+		{
+			RunTutorialTest("step7", "step7b.map", "source7.xml", "target7b.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step8()
+		{
+			RunTutorialTest("step8", "step8.map", "source8.xml", "target8.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step9a()
+		{
+			RunTutorialTest("step9", "step9.map", "source9.xml", "target9a.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step9b()
+		{
+			RunTutorialTest("step9", "step9.map", "source9b.xml", "target9b.xml");
+		}
+
+		[TestMethod]
+		public void Tutorial_Step10()
+		{
+            RunTutorialTest("step10", "step10.map", "source10.xml", "target10.xml");
+		}
+
+		public void RunTutorialTest(string stepFolderName, string mapFile, string sourceFile, string expectedResultFile, bool expectFailure = false)
+		{
+			var parser = new StructureMapUtilitiesParse();
+			var mapStep5 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\{stepFolderName}\map\{mapFile}");
+			var sm = parser.parse(mapStep5, mapFile);
+			//System.IO.File.WriteAllText(
+			//	@$"{mappingtutorial_folder}\maptutorial\step5\map\step5.xml.new",
+			//	_xmlSerializer.SerializeToString(sm));
+
+			var source3 = System.IO.File.ReadAllText(@$"{mappingtutorial_folder}\maptutorial\{stepFolderName}\source\{sourceFile}");
+			var sourceNode = FhirXmlNode.Parse(source3);
+
+            var directorySource = new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\{stepFolderName}\logical");
+            Dictionary<string, string> mapLogicalModelTypes = new Dictionary<string, string>();
+			foreach (var sd in directorySource.FindAll<StructureDefinition>())
+            {
+				mapLogicalModelTypes.Add(sd.Type, sd.Url);
+
+			}
+			var source = new CachedResolver(new MultiResolver(directorySource, ZipSource.CreateValidationSource()));
+			source.Load += Source_Load;
+			var worker = new TestWorker(source);
+
+			IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
+				source,
+				(string name, out string canonical) => {
+                    if (mapLogicalModelTypes.TryGetValue(name, out canonical))
+						return true;
+					return StructureDefinitionSummaryProvider.DefaultTypeNameMapper(name, out canonical);
+				});
+			var engine = new StructureMapUtilitiesExecute(worker, null, provider);
+			var target = engine.GenerateEmptyTargetOutputStructure(sm);
+			try
+			{
+				engine.transform(null, sourceNode.ToTypedElement(provider), sm, target);
+			}
+			catch (System.Exception ex)
+			{
+				System.Diagnostics.Trace.WriteLine(ex.Message);
+				if (!expectFailure)
+				{
+					Assert.Fail(ex.Message);
+				}
+				return;
+			}
+			var xml2 = target.ToXml(new FhirXmlSerializationSettings() { Pretty = true });
+			// var xml2 = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
+			System.Diagnostics.Trace.WriteLine(xml2);
+
+			// Now validate (or learn) the result of this test
+			var outputFolder = @$"{mappingtutorial_folder}\maptutorial\{stepFolderName}\output";
+            if (!Directory.Exists(outputFolder))
+                Directory.CreateDirectory(outputFolder);
+			var expectedResultFilename = @$"{mappingtutorial_folder}\maptutorial\{stepFolderName}\output\{expectedResultFile}";
+			if (File.Exists(expectedResultFile))
+            {
+				// compare the result with the expected result
+    			var expectedResult = System.IO.File.ReadAllText(expectedResultFilename);
+				Assert.AreEqual(expectedResult, xml2);
+			}
+            else
+            {
+                // "Learn" this result for next time (and can manually tweak the value if wasn't what was expected)
+                File.WriteAllText(expectedResultFilename, xml2);
+			}
+		}
+	}
 }

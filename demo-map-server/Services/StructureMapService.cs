@@ -84,7 +84,6 @@ namespace demo_map_server.Services
 				if (ct.Value.Any(v => v.Contains("json", StringComparison.OrdinalIgnoreCase)))
 					inputFormatIsJson = true;
 			}
-			ITypedElement resource = GetInputResource(operationParameters, ref inputFormatIsJson);
 			StructureMap sm = operationParameters["map"]?.Resource as StructureMap;
 			if (operationParameters["map"]?.Value is FhirString mapString)
 			{
@@ -105,27 +104,6 @@ namespace demo_map_server.Services
 					});
 
 				}
-			}
-
-			var resourceParams = operationParameters.Parameter.Where(p => p.Name == "resource" || p.Name == "content");
-			if (resourceParams.Count() > 1)
-			{
-				outcome.Issue.Add(new OperationOutcome.IssueComponent()
-				{
-					Code = OperationOutcome.IssueType.Incomplete,
-					Severity = OperationOutcome.IssueSeverity.Error,
-					Details = new CodeableConcept(null, null, "Multiple resources provided to transform")
-				});
-			}
-
-			if (resource == null)
-			{
-				outcome.Issue.Add(new OperationOutcome.IssueComponent()
-				{
-					Code = OperationOutcome.IssueType.Incomplete,
-					Severity = OperationOutcome.IssueSeverity.Error,
-					Details = new CodeableConcept(null, null, $"No content provided to transform with {sm?.Name}")
-				});
 			}
 
 			if (sm == null)
@@ -186,10 +164,11 @@ namespace demo_map_server.Services
 				var mr = new MultiResolver(imr, Source);
 				var worker = new MappingWorker(this, mr);
 
-				// Scan the map for required structuredefinitions for target types
-				var mapCanonicals = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
+				// Scan the map for required structuredefinitions for source types
+				// (source while parsing the source content, switches to target content once it's loaded)
+				var mapCanonicalsSource = StructureMapUtilitiesExecute.getSourceCanonicalTypeMapping(worker, sm);
 
-				IStructureDefinitionSummaryProvider provider = new StructureDefinitionSummaryProvider(
+				IStructureDefinitionSummaryProvider providerSource = new StructureDefinitionSummaryProvider(
 					mr,
 					(string name, out string canonical) =>
 					{
@@ -201,9 +180,9 @@ namespace demo_map_server.Services
 						}
 
 						// non FHIR types
-						if (mapCanonicals.ContainsKey(name))
+						if (mapCanonicalsSource.ContainsKey(name))
 						{
-							canonical = mapCanonicals[name];
+							canonical = mapCanonicalsSource[name];
 							return true;
 						}
 
@@ -211,9 +190,56 @@ namespace demo_map_server.Services
 						return false;
 					});
 
-				var mapServices = new InlineServices(outcome, provider);
+				// Scan the map for required structuredefinitions for target types
+				var mapCanonicalsTarget = StructureMapUtilitiesExecute.getCanonicalTypeMapping(worker, sm);
+
+				IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(
+					mr,
+					(string name, out string canonical) =>
+					{
+						// first assume it's a FHIR resource type and use that core content
+						if (ModelInfo.FhirTypeNameToFhirType(name).HasValue)
+						{
+							canonical = ModelInfo.CanonicalUriForFhirCoreType(name)?.Value;
+							return true;
+						}
+
+						// non FHIR types
+						if (mapCanonicalsTarget.ContainsKey(name))
+						{
+							canonical = mapCanonicalsTarget[name];
+							return true;
+						}
+
+						canonical = null;
+						return false;
+					});
+
+				var resourceParams = operationParameters.Parameter.Where(p => p.Name == "resource" || p.Name == "content");
+				if (resourceParams.Count() > 1)
+				{
+					outcome.Issue.Add(new OperationOutcome.IssueComponent()
+					{
+						Code = OperationOutcome.IssueType.Incomplete,
+						Severity = OperationOutcome.IssueSeverity.Error,
+						Details = new CodeableConcept(null, null, "Multiple resources provided to transform")
+					});
+				}
+
+				ITypedElement resource = GetInputResource(operationParameters, providerSource, ref inputFormatIsJson);
+				if (resource == null)
+				{
+					outcome.Issue.Add(new OperationOutcome.IssueComponent()
+					{
+						Code = OperationOutcome.IssueType.Incomplete,
+						Severity = OperationOutcome.IssueSeverity.Error,
+						Details = new CodeableConcept(null, null, $"No content provided to transform with {sm?.Name}")
+					});
+				}
+
+				var mapServices = new InlineServices(outcome, providerTarget);
 				mapServices.DebugMode = operationParameters["debug"]?.Value != null;
-				var engine = new StructureMapUtilitiesExecute(worker, mapServices, provider);
+				var engine = new StructureMapUtilitiesExecute(worker, mapServices, providerTarget);
 				var target = engine.GenerateEmptyTargetOutputStructure(sm);
 				engine.transform(null, resource, sm, target);
 
@@ -303,7 +329,7 @@ namespace demo_map_server.Services
 		/// <param name="operationParameters"></param>
 		/// <param name="inputFormatIsJson"></param>
 		/// <returns></returns>
-		private static ITypedElement GetInputResource(Parameters operationParameters, ref bool inputFormatIsJson)
+		private static ITypedElement GetInputResource(Parameters operationParameters, IStructureDefinitionSummaryProvider provider, ref bool inputFormatIsJson)
 		{
 			if (operationParameters["resource"]?.Resource != null)
 				return operationParameters["resource"]?.Resource.ToTypedElement();
@@ -319,14 +345,14 @@ namespace demo_map_server.Services
 				if (str.StartsWith('<'))
 				{
 					inputFormatIsJson = false;
-					var parser = new FhirXmlParser(parserSettings);
-					return parser.Parse<Resource>(str).ToTypedElement();
+					var xmlSettings = new FhirXmlParsingSettings() { PermissiveParsing = true };
+					return FhirXmlNode.Parse(str, xmlSettings).ToTypedElement(provider);
 				}
 				else
 				{
 					inputFormatIsJson = true;
-					var parser = new FhirJsonParser(parserSettings);
-					return parser.Parse<Resource>(str).ToTypedElement();
+					var jsonSettings = new FhirJsonParsingSettings() { PermissiveParsing = true, AllowJsonComments = true };
+					return FhirJsonNode.Parse(str, null, jsonSettings).ToTypedElement(provider);
 				}
 			}
 			catch (FormatException ex)
@@ -386,17 +412,15 @@ namespace demo_map_server.Services
 				{
 					sg.Update(sd);
 				}
+				if (sd.Abstract == true)
+					sd.Abstract = false;
 				result.Add(sd);
 			}
 			if (resource is Bundle b)
 			{
 				foreach (var bsd in b.GetResources().OfType<StructureDefinition>())
 				{
-					if (!bsd.HasSnapshot)
-					{
-						sg.Update(bsd);
-					}
-					result.Add(bsd);
+					ScanResource(sg, result, bsd);
 				}
 			}
 		}

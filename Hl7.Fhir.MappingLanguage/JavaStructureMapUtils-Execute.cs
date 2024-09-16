@@ -449,8 +449,9 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                     else if (srcType == tgtType)
                     {
-                        // There's no group to call, and we didn't throw, so the types are the same, just copy
-
+						// There's no group to call, and we didn't throw, so the types are the same, just copy
+						log("info", () => $"Source/Target are the same - copy value");
+						tgt.Value = src.Value;
                     }
                 }
             }
@@ -658,7 +659,7 @@ namespace Hl7.Fhir.MappingLanguage
                 if (srcType == tgtType)
                 {
                     // This is the same property, so just clone it
-                    log("warning", () => $"Source/Target are the same so should be able to clone them, however just returned null");
+                    // log("warning", () => $"Source/Target are the same so should be able to clone them, however just returned null");
                     return null;
                 }
                 else
@@ -755,8 +756,26 @@ namespace Hl7.Fhir.MappingLanguage
             return result;
 
         }
+		public static Dictionary<string, string> getSourceCanonicalTypeMapping(IWorkerContext worker, StructureMap map)
+		{
+			Dictionary<string, string> result = new Dictionary<string, string>();
+			foreach (StructureMap.StructureComponent structure in map.Structure)
+			{
+				if (structure.Mode == StructureMapModelMode.Source && !result.ContainsValue(structure.Url))
+				{
+					StructureDefinition sd = worker.fetchResource<StructureDefinition>(structure.Url);
+					if (sd == null)
+						throw new FHIRException("Unable to resolve structure " + structure.Url);
+					var url = sd.Derivation == StructureDefinition.TypeDerivationRule.Constraint ? sd.BaseDefinition : sd.Url;
+					if (!result.ContainsValue(url))
+						result.Add(sd.Type, url);
+				}
+			}
 
-        private string getActualType(StructureMap map, string statedType)
+			return result;
+		}
+
+		private string getActualType(StructureMap map, string statedType)
         {
             // check the aliases
             foreach (StructureMap.StructureComponent imp in map.Structure)
@@ -1469,7 +1488,7 @@ namespace Hl7.Fhir.MappingLanguage
                     src.System = parsedCoding.System;
                     src.Code = parsedCoding.Code;
                     src.Display = parsedCoding.Display;
-			}
+                }
 			}
 			// TODO: BRIAN what is the typename "CE"
 			//else if ("CE".Equals(source.TypeName))
@@ -1482,7 +1501,7 @@ namespace Hl7.Fhir.MappingLanguage
 			//        src.Code = b[0].primitiveValue();
 			//}
 			else
-                throw new FHIRException("Unable to translate source " + source.InstanceType);
+				throw new FHIRException("Unable to translate source " + source.InstanceType);
 
             string su = conceptMapUrl;
             if (conceptMapUrl.Equals("http://hl7.org/fhir/ConceptMap/special-oid2uri"))
