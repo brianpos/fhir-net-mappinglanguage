@@ -15,9 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="brianpos.Fhir.R4B.DemoFileSystemFhirServer" Version="5.10.0-beta1" />
-    <PackageReference Include="brianpos.Fhir.R4B.WebApi.AspNetCore" Version="5.10.0-beta1" />
-    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.10.0" />
+    <PackageReference Include="brianpos.Fhir.R4B.DemoFileSystemFhirServer" Version="5.10.2-beta1" />
+    <PackageReference Include="brianpos.Fhir.R4B.WebApi.AspNetCore" Version="5.10.2-beta1" />
+    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.10.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,9 +25,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R4" Version="5.10.0" GeneratePathProperty="true" ExcludeAssets="all" />
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.10.0" GeneratePathProperty="true" ExcludeAssets="all" />
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R5" Version="5.10.0" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4" Version="5.10.2" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.10.2" GeneratePathProperty="true" ExcludeAssets="all" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R5" Version="5.10.2" GeneratePathProperty="true" ExcludeAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

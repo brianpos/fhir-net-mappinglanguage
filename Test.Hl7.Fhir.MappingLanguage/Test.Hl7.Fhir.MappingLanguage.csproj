@@ -16,10 +16,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Hl7.Fhir.R4B" Version="5.10.0" />
-    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.10.0" />
+    <PackageReference Include="Hl7.Fhir.R4B" Version="5.10.2" />
+    <PackageReference Include="Hl7.Fhir.Specification.R4B" Version="5.10.2" />
     <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4B" Version="5.9.0" />
-    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.10.0" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4B" Version="5.10.2" />
     <PackageReference Include="Firely.Fhir.Packages" Version="4.7.0" />
   </ItemGroup>
 
