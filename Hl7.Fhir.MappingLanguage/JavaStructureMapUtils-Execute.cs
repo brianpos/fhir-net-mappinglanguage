@@ -451,7 +451,11 @@ namespace Hl7.Fhir.MappingLanguage
                     {
 						// There's no group to call, and we didn't throw, so the types are the same, just copy
 						log("info", () => $"Source/Target are the same - copy value");
-						tgt.Value = src.Value;
+                        var srcChildren = src.Children();
+                        foreach (var child in srcChildren)
+                        {
+                            tgt.Add(pkp, ElementNode.FromElement(child, true), child.Name);
+                        }
                     }
                 }
             }
