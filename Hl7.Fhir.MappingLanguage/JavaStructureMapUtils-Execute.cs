@@ -456,6 +456,10 @@ namespace Hl7.Fhir.MappingLanguage
                         {
                             tgt.Add(pkp, ElementNode.FromElement(child, true), child.Name);
                         }
+
+                        // and copy the primitive value over
+                        if (src.Value != null)
+                            tgt.Value = src.Value;
                     }
                 }
             }

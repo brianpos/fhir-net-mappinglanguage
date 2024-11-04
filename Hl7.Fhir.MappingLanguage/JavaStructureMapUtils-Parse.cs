@@ -1275,8 +1275,10 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 lexer.token(".");
                 source.Element = lexer.take();
-            }
-            if (lexer.hasToken(":"))
+				if (source.Element.StartsWith("`"))
+					source.Element = lexer.processConstant(source.Element);
+			}
+			if (lexer.hasToken(":"))
             {
                 // type and cardinality
                 lexer.token(":");
@@ -1342,6 +1344,8 @@ namespace Hl7.Fhir.MappingLanguage
                 start = null;
                 lexer.token(".");
                 target.Element = lexer.take();
+                if (target.Element.StartsWith("`"))
+                    target.Element = lexer.processConstant(target.Element);
             }
             string name;
             bool isConstant = false;
