@@ -22,6 +22,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Hl7.Fhir.MappingLanguage.R5
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.Hl7.Fhir.MappingLanguage.R5", "Test.Hl7.Fhir.MappingLanguage.R5\Test.Hl7.Fhir.MappingLanguage.R5.csproj", "{8AAA93A0-C739-4FC8-89EB-AC9448C7A32A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hl7.Fhir.MappingLanguage.R4", "Hl7.Fhir.MappingLanguage.R4\Hl7.Fhir.MappingLanguage.R4.csproj", "{538B4774-CBC2-3610-2499-9873AADD39D8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{8AAA93A0-C739-4FC8-89EB-AC9448C7A32A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AAA93A0-C739-4FC8-89EB-AC9448C7A32A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AAA93A0-C739-4FC8-89EB-AC9448C7A32A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{538B4774-CBC2-3610-2499-9873AADD39D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{538B4774-CBC2-3610-2499-9873AADD39D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{538B4774-CBC2-3610-2499-9873AADD39D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{538B4774-CBC2-3610-2499-9873AADD39D8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
