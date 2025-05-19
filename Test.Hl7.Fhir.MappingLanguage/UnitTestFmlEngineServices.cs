@@ -50,7 +50,31 @@ namespace Test.FhirMappingLanguage
             Console.ResetColor();
         }
 
-        public List<ITypedElement> performSearch(object appContext, string url)
+		public void log(string category, Func<LogMessage> message)
+		{
+			if (category != "error")
+				return;
+			switch (category)
+			{
+				case "error":
+					Console.ForegroundColor = ConsoleColor.Red;
+					break;
+				case "debug":
+					Console.ForegroundColor = ConsoleColor.DarkGray;
+					break;
+				case "info":
+					Console.ForegroundColor = ConsoleColor.Green;
+					break;
+				case "prop":
+					Console.ForegroundColor = ConsoleColor.White;
+					break;
+			}
+			var result = message();
+			Console.WriteLine($"{category}: {result.message}");
+			Console.ResetColor();
+		}
+
+		public List<ITypedElement> performSearch(object appContext, string url)
         {
             throw new NotImplementedException();
         }

@@ -989,6 +989,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void parseGroup(StructureMap result, FHIRLexer lexer)
         {
+			var positionAnnotation = DebugAnnotation.Start(lexer);
             String comment = lexer.getAllComments();
             lexer.token("group");
             StructureMap.GroupComponent group = new StructureMap.GroupComponent();
@@ -1017,7 +1018,7 @@ namespace Hl7.Fhir.MappingLanguage
                 group.TypeMode = StructureMap.StructureMapGroupTypeMode.None;
 #endif
             group.Name = lexer.take();
-            if (lexer.hasToken("("))
+			if (lexer.hasToken("("))
             {
                 newFmt = true;
                 lexer.take();
@@ -1079,8 +1080,9 @@ namespace Hl7.Fhir.MappingLanguage
                     parseRule(result, group.Rule, lexer, false);
                 }
             }
+			positionAnnotation.TagEnd(group, lexer);
             lexer.next();
-            if (newFmt && lexer.hasToken(";"))
+			if (newFmt && lexer.hasToken(";"))
                 lexer.next();
         }
 
@@ -1111,7 +1113,8 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void parseRule(StructureMap map, List<StructureMap.RuleComponent> list, FHIRLexer lexer, bool newFmt)
         {
-            StructureMap.RuleComponent rule = new StructureMap.RuleComponent();
+			var ruleAnnotation = DebugAnnotation.Start(lexer);
+			StructureMap.RuleComponent rule = new StructureMap.RuleComponent();
             list.Add(rule);
             if (!newFmt)
             {
@@ -1202,13 +1205,18 @@ namespace Hl7.Fhir.MappingLanguage
                     else
                         rule.Name = rule.getSourceFirstRep().Element;
                 }
-                lexer.token(";");
+				ruleAnnotation.TagEnd(rule, lexer);
+				lexer.token(";");
 
                 // only required for R4, R5 has removed this constraint
                 if (string.IsNullOrEmpty(rule.Name) && ModelInfo.Version.StartsWith("4"))
                     rule.Name = Guid.NewGuid().ToFhirId();
             }
-        }
+			else
+			{
+				ruleAnnotation.TagEnd(rule, lexer);
+			}
+		}
 
         private bool isSimpleSyntax(StructureMap.RuleComponent rule)
         {
@@ -1259,7 +1267,8 @@ namespace Hl7.Fhir.MappingLanguage
 
 		private void parseSource(StructureMap.RuleComponent rule, FHIRLexer lexer)
         {
-            var source = new StructureMap.SourceComponent();
+			var sourceNode = DebugAnnotation.Start(lexer);
+			var source = new StructureMap.SourceComponent();
             rule.Source.Add(source);
             source.Context = lexer.take();
             if (source.Context.Equals("search") && lexer.hasToken("("))
@@ -1277,11 +1286,13 @@ namespace Hl7.Fhir.MappingLanguage
                 source.Element = lexer.take();
 				if (source.Element.StartsWith("`"))
 					source.Element = lexer.processConstant(source.Element);
+				sourceNode.TagEnd(source.ElementElement, lexer);
 			}
 			if (lexer.hasToken(":"))
             {
-                // type and cardinality
-                lexer.token(":");
+				// type and cardinality
+				var typeNode = DebugAnnotation.Start(lexer);
+				lexer.token(":");
                 source.Type = lexer.takeDottedToken();
                 if (Utilities.isInteger(lexer.getCurrent()))
                 {
@@ -1289,55 +1300,70 @@ namespace Hl7.Fhir.MappingLanguage
                     lexer.token("..");
                     source.Max = lexer.take();
                 }
-            }
+				typeNode.TagEnd(source.TypeElement, lexer);
+			}
             if (lexer.hasToken("default"))
             {
-                lexer.token("default");
+				var defaultNode = DebugAnnotation.Start(lexer);
+				lexer.token("default");
 #if FHIR_R5
                 source.DefaultValue = lexer.readConstant("default value");
+				defaultNode.TagEnd(source.DefaultValueElement, lexer);
 #else
                 source.DefaultValue = new FhirString(lexer.readConstant("default value"));
+				defaultNode.TagEnd(source.DefaultValue, lexer);
 #endif
-            }
-            if (Utilities.existsInList(lexer.getCurrent(), "first", "last", "not_first", "not_last", "only_one"))
+			}
+			if (Utilities.existsInList(lexer.getCurrent(), "first", "last", "not_first", "not_last", "only_one"))
                 source.ListMode = EnumUtility.ParseLiteral<StructureMap.StructureMapSourceListMode>(lexer.take());
 
             if (lexer.hasToken("as"))
             {
-                lexer.take();
+				var asNode = DebugAnnotation.Start(lexer);
+				lexer.take();
                 source.Variable = lexer.take();
-            }
-            if (lexer.hasToken("where"))
+				asNode.TagEnd(source.VariableElement, lexer);
+			}
+			if (lexer.hasToken("where"))
             {
-                lexer.take();
+				var checkNode = DebugAnnotation.Start(lexer);
+				lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
                 source.setUserData(MAP_WHERE_EXPRESSION, node);
                 source.Condition = node.ToString();
-            }
-            if (lexer.hasToken("check"))
+				checkNode.TagEnd(source.ConditionElement, lexer);
+			}
+			if (lexer.hasToken("check"))
             {
-                lexer.take();
+				var checkNode = DebugAnnotation.Start(lexer);
+				lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
                 source.setUserData(MAP_WHERE_CHECK, node);
                 source.Check = node.ToString();
-            }
-            if (lexer.hasToken("log"))
+				checkNode.TagEnd(source.CheckElement, lexer);
+			}
+			if (lexer.hasToken("log"))
             {
+				var logNode = DebugAnnotation.Start(lexer);
                 lexer.take();
                 ExpressionNode node = fpe.parse(lexer);
                 source.setUserData(MAP_WHERE_LOG, node);
                 source.LogMessage = node.ToString();
-            }
-        }
+				logNode.TagEnd(source.LogMessageElement, lexer);
+			}
+			sourceNode.TagEnd(source, lexer);
+		}
 
         private void parseTarget(StructureMap.RuleComponent rule, FHIRLexer lexer)
         {
-            var target = new StructureMap.TargetComponent();
+			var targetNode = DebugAnnotation.Start(lexer);
+			var target = new StructureMap.TargetComponent();
             rule.Target.Add(target);
-            string start = lexer.take();
+			var targetElementNode = DebugAnnotation.Start(lexer);
+			string start = lexer.take();
             if (lexer.hasToken("."))
             {
-                target.Context = start;
+				target.Context = start;
 #if !FHIR_R5
                 target.ContextType = StructureMap.StructureMapContextType.Variable;
 #endif
@@ -1346,8 +1372,10 @@ namespace Hl7.Fhir.MappingLanguage
                 target.Element = lexer.take();
                 if (target.Element.StartsWith("`"))
                     target.Element = lexer.processConstant(target.Element);
-            }
-            string name;
+			}
+			targetElementNode.TagEnd(target.ElementElement, lexer);
+
+			string name;
             bool isConstant = false;
             if (lexer.hasToken("="))
             {
@@ -1362,17 +1390,20 @@ namespace Hl7.Fhir.MappingLanguage
 
             if ("(".Equals(name))
             {
-                // inline fluentpath expression
-                target.Transform = StructureMap.StructureMapTransform.Evaluate;
+				// inline fluentpath expression
+				var transformNode = DebugAnnotation.Start(lexer);
+				target.Transform = StructureMap.StructureMapTransform.Evaluate;
                 // consider if this *should* prefix the expression at this stage with the %
                 ExpressionNode node = fpe.parse(lexer);
                 target.addParameter().Value = new FhirString(node.ToString());
                 target.setUserData(MAP_EXPRESSION, node);
                 lexer.token(")");
-            }
+				transformNode.TagEnd(target.TransformElement, lexer);
+			}
             else if (lexer.hasToken("("))
             {
-                target.Transform = EnumUtility.ParseLiteral<StructureMap.StructureMapTransform>(name);
+				var transformNode = DebugAnnotation.Start(lexer);
+				target.Transform = EnumUtility.ParseLiteral<StructureMap.StructureMapTransform>(name);
                 lexer.token("(");
                 if (target.Transform == StructureMap.StructureMapTransform.Evaluate)
                 {
@@ -1392,10 +1423,12 @@ namespace Hl7.Fhir.MappingLanguage
                     }
                 }
                 lexer.token(")");
-            }
-            else if (name != null)
+				transformNode.TagEnd(target.TransformElement, lexer);
+			}
+			else if (name != null)
             {
-                target.Transform = StructureMap.StructureMapTransform.Copy;
+				var transformNode = DebugAnnotation.Start(lexer);
+				target.Transform = StructureMap.StructureMapTransform.Copy;
                 if (!isConstant)
                 {
                     string id = name;
@@ -1407,8 +1440,9 @@ namespace Hl7.Fhir.MappingLanguage
                 }
                 else
                     target.addParameter().Value = readConstant(name, lexer);
-            }
-            if (lexer.hasToken("as"))
+				transformNode.TagEnd(target.TransformElement, lexer);
+			}
+			if (lexer.hasToken("as"))
             {
                 lexer.take();
                 target.Variable = lexer.take();
@@ -1431,7 +1465,8 @@ namespace Hl7.Fhir.MappingLanguage
                     lexer.next();
                 }
             }
-        }
+			targetNode.TagEnd(target, lexer);
+		}
 
         private void parseParameter(StructureMap.TargetComponent target, FHIRLexer lexer)
         {

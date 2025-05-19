@@ -8,7 +8,7 @@ namespace demo_map_server.Services
 {
     internal class InlineServices : StructureMapUtilitiesAnalyze.ITransformerServices
     {
-        public List<KeyValuePair<string, string>> LogMessages { get; private set; } = new List<KeyValuePair<string, string>>();
+        public List<KeyValuePair<string, LogMessage>> LogMessages { get; private set; } = new List<KeyValuePair<string, LogMessage>>();
         /// <summary>
         /// Debug Mode Off will not evaluate debug/trace messages which can be quite costly in that the variables are serialized out
         /// </summary>
@@ -19,7 +19,7 @@ namespace demo_map_server.Services
             StringBuilder sb = new StringBuilder();
             foreach (var log in LogMessages)
             {
-                sb.AppendLine($"{log.Key}: {log.Value}");
+                sb.AppendLine($"{log.Key}: {log.Value.message}");
             }
             return sb.ToString();
         }
@@ -43,8 +43,9 @@ namespace demo_map_server.Services
 
         public void log(string category, Func<string> message)
         {
+			var result = message();
             if (DebugMode || category == "error")
-                LogMessages.Add(new KeyValuePair<string, string>(category, message()));
+                LogMessages.Add(new KeyValuePair<string, LogMessage>(category, new LogMessage(result)));
 
             if (category == "error")
             {
@@ -57,7 +58,24 @@ namespace demo_map_server.Services
             }
         }
 
-        public List<ITypedElement> performSearch(object appContext, string url)
+		public void log(string category, Func<LogMessage> message)
+		{
+			var result = message();
+			if (DebugMode || category == "error")
+				LogMessages.Add(new KeyValuePair<string, LogMessage>(category, result));
+
+			if (category == "error")
+			{
+				_outcome.Issue.Insert(0, new OperationOutcome.IssueComponent
+				{
+					Code = OperationOutcome.IssueType.Informational,
+					Severity = OperationOutcome.IssueSeverity.Information,
+					Details = new CodeableConcept(null, null, result.message)
+				});
+			}
+		}
+
+		public List<ITypedElement> performSearch(object appContext, string url)
         {
             throw new NotImplementedException();
         }

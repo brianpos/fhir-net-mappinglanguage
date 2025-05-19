@@ -273,6 +273,14 @@ namespace Hl7.Fhir.MappingLanguage
                 System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
         }
 
+		private void log(string category, Func<LogMessage> message)
+		{
+			if (services != null)
+				services.log(category, message);
+			else
+				System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+		}
+
         /**
          * Given an item, return all the children that conform to the pattern described in name
          *
@@ -340,7 +348,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeGroup(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, bool atRoot)
         {
-            log("debug", () => indent + "Group : " + group.Name + "; vars = " + vars.summary());
+            log("debug", () => new LogMessage(indent + "Group : " + group.Name + "; vars = " + vars.summary(), vars, group ));
             // todo: check inputs
             if (!string.IsNullOrEmpty(group.Extends))
             {
@@ -390,7 +398,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
-            log("debug", () => indent + "rule : " + rule.Name + "; vars = " + vars.summary());
+            log("debug", () => new LogMessage(indent + "rule : " + rule.Name + "; vars = " + vars.summary(), vars, rule));
             if (rule.Source.Count() == 0)
                 throw new FHIRException("Rule \"" + rule.Name + "\": has no sources to execute from");
             if (rule.Source.Count() > 1)
@@ -976,11 +984,11 @@ namespace Hl7.Fhir.MappingLanguage
                 {
                     if (!fpe.evaluateToBoolean(varsForSource, null, null, item, expr))
                     {
-                        log("debug", () => indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false");
+                        log("debug", () => new LogMessage(indent + $"  condition [{src.Condition}] for {item.ToJson()} [{item.InstanceType}] : false", varsForSource, src));
                         remove.Add(item);
                     }
                     else
-                        log("debug", () => indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true");
+                        log("debug", () => new LogMessage(indent + "  condition [" + src.Condition + "] for " + item.ToJson() + " : true", varsForSource, src));
                 }
                 items.RemoveAll(r => remove.Contains(r));
                 varsForSource.RemoveAll(r => remove.Contains(r));
@@ -1017,7 +1025,7 @@ namespace Hl7.Fhir.MappingLanguage
 				foreach (ITypedElement item in items)
 					b.appendIfNotNull(fpe.evaluateToString(varsForSource, null, null, item, expr));
 				if (b.Length() > 0)
-					log("info", () => b.ToString());
+					log("info", () => new LogMessage(b.ToString(), varsForSource, src.LogMessageElement));
 			}
 
 			List<Variable> result = new List<Variable>();
@@ -1060,7 +1068,7 @@ namespace Hl7.Fhir.MappingLanguage
             {
                 v = runTransform(ruleId, context, map, group, tgt, vars, dest, tgt.Element, srcVar, atRoot);
                 if (v != null && dest != null)
-                    v = dest.setProperty(log, pkp, tgt.Element, v); // reset v because some implementations may have to rewrite v when setting the value
+                    v = dest.setProperty(log, pkp, tgt.ElementElement, v); // reset v because some implementations may have to rewrite v when setting the value
             }
             else if (dest != null)
             {
@@ -1069,13 +1077,13 @@ namespace Hl7.Fhir.MappingLanguage
                     v = sharedVars.get(VariableMode.SHARED, tgt.ListRuleId);
                     if (v == null)
                     {
-                        v = dest.makeProperty(log, pkp, tgt.Element);
+                        v = dest.makeProperty(log, pkp, tgt.ElementElement);
                         sharedVars.add(VariableMode.SHARED, tgt.ListRuleId, v);
                     }
                 }
                 else
                 {
-                    v = dest.makeProperty(log, pkp, tgt.Element);
+                    v = dest.makeProperty(log, pkp, tgt.ElementElement);
                 }
             }
             if (!string.IsNullOrEmpty(tgt.Variable) && v != null)
@@ -1145,7 +1153,7 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         if (tgt.hasUserData("profile"))
                             res.setUserData("profile", tgt.getUserData("profile"));
-                        log("debug", () => $"Create {tn}");
+                        log("debug", () => new LogMessage($"Create {tn}", null, tgt.TransformElement));
                         return res;
 
                     case StructureMap.StructureMapTransform.Copy:
@@ -1322,7 +1330,7 @@ namespace Hl7.Fhir.MappingLanguage
                             if (id == null)
                             {
                                 id = Guid.NewGuid().ToFhirId();
-                                b.setProperty(log, pkp, "id", ElementNode.ForPrimitive(id));
+                                b.setProperty(log, pkp, new FhirString("id"), ElementNode.ForPrimitive(id));
                             }
                             return ElementNode.ForPrimitive(b.InstanceType + "/" + id);
                         }

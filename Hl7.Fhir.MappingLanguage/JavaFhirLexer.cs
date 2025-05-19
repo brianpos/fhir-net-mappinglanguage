@@ -97,7 +97,10 @@ namespace Hl7.Fhir.MappingLanguage
         private int id;
         private string name;
 
-        public FHIRLexer(string source, string name)
+		public int CurrentStart() => currentStart;
+		public int Cursor() => cursor;
+
+		public FHIRLexer(string source, string name)
         {
             this.source = source;
             this.name = name == null ? "??" : name;
@@ -759,7 +762,13 @@ public class SourceLocation
         this.column = column;
     }
 
-    public int getLine()
+	public SourceLocation(SourceLocation other)
+	{
+		this.line = other.line;
+		this.column = other.column;
+	}
+
+	public int getLine()
     {
         return line;
     }

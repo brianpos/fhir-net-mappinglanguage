@@ -31,8 +31,8 @@ namespace VersionConversionTester
         {
             if (category != "error")
             {
-				// System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
-				return;
+                // System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+                return;
             }
             switch (category)
             {
@@ -49,8 +49,36 @@ namespace VersionConversionTester
                     Console.ForegroundColor = ConsoleColor.White;
                     break;
             }
-			System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
-			Console.WriteLine($"{category}: {message()}");
+            System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+            Console.WriteLine($"{category}: {message()}");
+            Console.ResetColor();
+        }
+
+        public void log(string category, Func<LogMessage> message)
+        {
+            if (category != "error")
+            {
+                // System.Diagnostics.Trace.WriteLine($"{category}: {message()}");
+                return;
+            }
+            switch (category)
+            {
+                case "error":
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    break;
+                case "debug":
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    break;
+                case "info":
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    break;
+                case "prop":
+                    Console.ForegroundColor = ConsoleColor.White;
+                    break;
+            }
+            var result = message();
+            System.Diagnostics.Trace.WriteLine($"{category}: {result.message}");
+            Console.WriteLine($"{category}: {message()}");
             Console.ResetColor();
         }
 

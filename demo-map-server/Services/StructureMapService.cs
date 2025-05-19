@@ -1,5 +1,6 @@
 ﻿using demo_map_server.StructureMapTransform;
 using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.MappingLanguage;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -295,11 +296,45 @@ namespace demo_map_server.Services
 					result.Parameter.Add(resultTrace);
 					foreach (var log in mapServices.LogMessages)
 					{
-						resultTrace.Part.Add(new Parameters.ParameterComponent()
+						var part = new Parameters.ParameterComponent()
 						{
 							Name = log.Key,
-							Value = new FhirString(log.Value)
-						});
+							Value = new FhirString(log.Value.message)
+						};
+						if (log.Value.debugAnnotation != null)
+						{
+							var debugAnnot = log.Value.debugAnnotation;
+							//part.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Location",
+							//	$"L{debugAnnot.StartLoc?.getLine()} C{debugAnnot.StartLoc?.getColumn()} - L{debugAnnot.EndLoc.getLine()} C{debugAnnot.EndLoc.getColumn()}");
+							part.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Cursor",
+								$"{debugAnnot.StartCursor} - {debugAnnot.EndCursor}");
+							if (log.Value.vars != null)
+							{
+								foreach (var v in log.Value.vars.All())
+								{
+									// Stash either the value (primitive) or the location of the property via its short path
+									var value = v.getObject();
+									var extValue = new Extension();
+									extValue.SetStringExtension("name-" + v.Mode, v.Name);
+									part.AddExtension("http://fhirpath-lab.com/StructureDefinition/Variable", extValue);
+
+									if (value is IShortPathGenerator spg)
+									{
+										extValue.SetStringExtension("path", spg.ShortPath);
+									}
+									else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
+									{
+										extValue.SetExtension("value", dt);
+									}
+									else
+									{
+										// constant values?
+
+									}
+								}
+							}
+						}
+						resultTrace.Part.Add(part);
 					}
 					return result;
 				}

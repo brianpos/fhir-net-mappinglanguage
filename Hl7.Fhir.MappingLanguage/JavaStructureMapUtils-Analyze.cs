@@ -74,7 +74,8 @@ namespace Hl7.Fhir.MappingLanguage
         {
             //    public bool validateByValueSet(Coding code, string valuesetId);
             public void log(string category, Func<string> message); // log internal progress
-            public ITypedElement createType(Object appInfo, string name);
+			public void log(string category, Func<LogMessage> message); // log internal progress
+			public ITypedElement createType(Object appInfo, string name);
             public ITypedElement createResource(Object appInfo, ITypedElement res, bool atRootofTransform); // an already created resource is provided; this is to identify/store it
             public Coding translate(Object appInfo, Coding source, string conceptMapUrl);
             //    public Coding translate(Coding code)

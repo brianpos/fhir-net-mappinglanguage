@@ -44,7 +44,50 @@ using static Hl7.Fhir.Model.ElementDefinition;
 
 namespace Hl7.Fhir.MappingLanguage
 {
-    public class CommaSeparatedStringBuilder
+	public class DebugAnnotation
+	{
+		internal static DebugAnnotation Start(FHIRLexer lexer)
+		{
+			return new DebugAnnotation(lexer.CurrentStart(), lexer.getCurrentLocation());
+		}
+
+		private DebugAnnotation(int cursor, SourceLocation location)
+		{
+			StartCursor = cursor;
+			StartLoc = new SourceLocation(location.getLine(), location.getColumn());
+		}
+
+		internal void TagEnd<T>(T target, FHIRLexer lexer)
+			where T : IExtendable, IAnnotatable
+		{
+			TagEnd(target, lexer.Cursor(), lexer.getCurrentLocation());
+		}
+
+		private void TagEnd<T>(T target, int cursor, SourceLocation location)
+			where T : IExtendable, IAnnotatable
+		{
+			EndCursor = cursor;
+			EndLoc = new SourceLocation(location.getLine(), location.getColumn());
+
+			// And tag it onto the resource
+			target.SetAnnotation(this);
+
+			// And put it temporarily into an extension
+			target.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Location",
+				$"L{StartLoc?.getLine()} C{StartLoc?.getColumn()} - L{EndLoc.getLine()} C{EndLoc.getColumn()}");
+			target.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Cursor",
+				$"{StartCursor} - {EndCursor}");
+		}
+
+		public int StartCursor { get; private set; }
+		public int EndCursor { get; private set; }
+
+		public SourceLocation StartLoc { get; private set; }
+		public SourceLocation EndLoc { get; private set; }
+
+	}
+
+	public class CommaSeparatedStringBuilder
     {
         public CommaSeparatedStringBuilder()
         {
@@ -507,14 +550,14 @@ namespace Hl7.Fhir.MappingLanguage
         //    return null;
         //}
 
-        public static ITypedElement setProperty(this ITypedElement me, Action<string, Func<string>> Log, IStructureDefinitionSummaryProvider pkp, string name, ITypedElement value)
+        public static ITypedElement setProperty(this ITypedElement me, Action<string, Func<LogMessage>> Log, IStructureDefinitionSummaryProvider pkp, FhirString name, ITypedElement value)
         {
             if (me is ElementNode en)
             {
                 if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
                 {
                     // this is a primitive element
-                    Log("prop", () => $"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive");
+                    Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive", null, name));
                     en.Value = value.Value;
                     return en;
                 }
@@ -531,13 +574,13 @@ namespace Hl7.Fhir.MappingLanguage
                 if (me.Definition != null)
                 {
                     // Check if this is a multi-cardinality item
-                    var cd = me.ChildDefinitions(pkp).FirstOrDefault(cd => cd.ElementName == name);
+                    var cd = me.ChildDefinitions(pkp).FirstOrDefault(cd => cd.ElementName == name.Value);
                     if (cd != null)
                     {
                         if (!cd.IsCollection)
                         {
                             // Remove any existing values
-                            if (me.Children(name).Any())
+                            if (me.Children(name.Value).Any())
                             {
 								// Need to check if the types are ok to use
 								if (!cd.Type.Any(t => t.GetTypeName() == value.InstanceType))
@@ -546,16 +589,16 @@ namespace Hl7.Fhir.MappingLanguage
 									if (Property.isPrimitive(value.InstanceType) && cd.Type.Length == 1 && Property.isPrimitive(cd.Type[0].GetTypeName()))
 									{
 										// set the primitive value inside
-                                        var existingValues = en[name];
+                                        var existingValues = en[name.Value];
                                         existingValues[0].Value = value.Value;
-										Log("prop", () => $"SetProp {me.Location}.{name} with '{existingValues[0].Value}'({existingValues[0].InstanceType}) - replace primitive");
+										Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{existingValues[0].Value}'({existingValues[0].InstanceType}) - replace primitive", null, name));
 										return existingValues[0];
 									}
-									Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
+									Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", null, name));
 								}
 
-								Log("prop", () => $"Replacing an existing node at {me.Location}.{name}");
-                                en.Replace(pkp, me.Children(name).First() as ElementNode, ne);
+								Log("prop", () => new LogMessage($"Replacing an existing node at {me.Location}.{name}", null, name));
+                                en.Replace(pkp, me.Children(name.Value).First() as ElementNode, ne);
                                 return ne;
                             }
                         }
@@ -569,26 +612,26 @@ namespace Hl7.Fhir.MappingLanguage
                                 var result = makeProperty(en, Log, pkp, name) as ElementNode;
 								// and set the primitive value inside
 								result.Value = value.Value;
-								Log("prop", () => $"SetProp {me.Location}.{name} with '{result.Value}'({result.InstanceType}) - primitive");
+								Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{result.Value}'({result.InstanceType}) - primitive", null, name));
 								return result;
 							}
-							Log("warning", () => $"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}");
+							Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", null, name));
                         }
                     }
                 }
-                Log("prop", () => $"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})");
-                return en.Add(pkp, ne, name);
+                Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})", null, name));
+                return en.Add(pkp, ne, name.Value);
                 // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
             return null;
         }
 
-        public static ITypedElement makeProperty(this ITypedElement me, Action<string, Func<string>> Log, IStructureDefinitionSummaryProvider pkp, string name)
+        public static ITypedElement makeProperty(this ITypedElement me, Action<string, Func<LogMessage>> Log, IStructureDefinitionSummaryProvider pkp, FhirString name)
         {
             if (me is ElementNode en)
             {
-                Log("prop", () => $"MakeProp {name} context: {me.Location}");
-                var result = en.Add(pkp, name);
+                Log("prop", () => new LogMessage($"MakeProp {name.Value} context: {me.Location}", null, name));
+                var result = en.Add(pkp, name.Value);
                 return result;
             }
             return null;

@@ -39,7 +39,8 @@
     <Compile Include="..\Hl7.Fhir.MappingLanguage\JavaTypeDetails.cs" Link="JavaTypeDetails.cs" />
     <Compile Include="..\Hl7.Fhir.MappingLanguage\JavaUtilities.cs" Link="JavaUtilities.cs" />
     <Compile Include="..\Hl7.Fhir.MappingLanguage\ValidationResult.cs" Link="ValidationResult.cs" />
-  </ItemGroup>
+		<Compile Include="..\Hl7.Fhir.MappingLanguage\LogMessage.cs" Link="LogMessage.cs" />
+	</ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
