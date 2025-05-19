@@ -1377,7 +1377,8 @@ namespace Hl7.Fhir.MappingLanguage
 
 			string name;
             bool isConstant = false;
-            if (lexer.hasToken("="))
+			var transformNode = DebugAnnotation.Start(lexer);
+			if (lexer.hasToken("="))
             {
                 if (start != null)
                     target.Context = start;
@@ -1391,7 +1392,6 @@ namespace Hl7.Fhir.MappingLanguage
             if ("(".Equals(name))
             {
 				// inline fluentpath expression
-				var transformNode = DebugAnnotation.Start(lexer);
 				target.Transform = StructureMap.StructureMapTransform.Evaluate;
                 // consider if this *should* prefix the expression at this stage with the %
                 ExpressionNode node = fpe.parse(lexer);
@@ -1402,7 +1402,6 @@ namespace Hl7.Fhir.MappingLanguage
 			}
             else if (lexer.hasToken("("))
             {
-				var transformNode = DebugAnnotation.Start(lexer);
 				target.Transform = EnumUtility.ParseLiteral<StructureMap.StructureMapTransform>(name);
                 lexer.token("(");
                 if (target.Transform == StructureMap.StructureMapTransform.Evaluate)
@@ -1427,7 +1426,6 @@ namespace Hl7.Fhir.MappingLanguage
 			}
 			else if (name != null)
             {
-				var transformNode = DebugAnnotation.Start(lexer);
 				target.Transform = StructureMap.StructureMapTransform.Copy;
                 if (!isConstant)
                 {

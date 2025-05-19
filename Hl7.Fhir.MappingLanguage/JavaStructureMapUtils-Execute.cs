@@ -1153,10 +1153,11 @@ namespace Hl7.Fhir.MappingLanguage
                         }
                         if (tgt.hasUserData("profile"))
                             res.setUserData("profile", tgt.getUserData("profile"));
-                        log("debug", () => new LogMessage($"Create {tn}", null, tgt.TransformElement));
+                        log("debug", () => new LogMessage($"Create {tn}", vars, tgt.TransformElement));
                         return res;
 
                     case StructureMap.StructureMapTransform.Copy:
+						log("debug", () => new LogMessage($"Copy", vars, tgt.TransformElement));
                         return getParam(vars, tgt.Parameter.First());
 
                     case StructureMap.StructureMapTransform.Evaluate:
@@ -1179,6 +1180,7 @@ namespace Hl7.Fhir.MappingLanguage
 							}
 							tgt.setUserData(MAP_EXPRESSION, expr);
                         }
+						log("debug", () => new LogMessage($"Evaluate ({expr.ToString()})", vars, tgt.TransformElement));
                         IEnumerable<ITypedElement> v = fpe.evaluate(vars, null, null, tgt.Parameter.Count() == 2 ? getParam(vars, tgt.Parameter.First()) : ElementNode.ForPrimitive(false), expr);
                         if (v.Count() == 0)
                             return null;
@@ -1313,6 +1315,7 @@ namespace Hl7.Fhir.MappingLanguage
                         StringBuilder sb = new StringBuilder(getParamString(vars, tgt.Parameter.First()));
                         for (int i = 1; i < tgt.Parameter.Count(); i++)
                             sb.Append(getParamString(vars, tgt.Parameter[i]));
+						log("debug", () => new LogMessage($"Append ...", null, tgt.TransformElement));
                         return ElementNode.ForPrimitive(sb.ToString());
 
                     case StructureMap.StructureMapTransform.Translate:
