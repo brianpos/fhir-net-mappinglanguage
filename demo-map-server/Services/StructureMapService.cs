@@ -314,9 +314,9 @@ namespace demo_map_server.Services
 								{
 									// Stash either the value (primitive) or the location of the property via its short path
 									var value = v.getObject();
-									var extValue = new Extension();
+									var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
 									extValue.SetStringExtension("name-" + v.Mode, v.Name);
-									part.AddExtension("http://fhirpath-lab.com/StructureDefinition/Variable", extValue);
+									part.Extension.Add(extValue);
 
 									if (value is IShortPathGenerator spg)
 									{
