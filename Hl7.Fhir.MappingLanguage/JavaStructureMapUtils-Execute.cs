@@ -348,7 +348,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeGroup(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, bool atRoot)
         {
-            log("debug", () => new LogMessage(indent + "Group : " + group.Name + "; vars = " + vars.summary(), vars, group ));
+            log("debug", () => new LogMessage(indent + "Group : " + group.Name/* + "; vars = " + vars.summary()*/, vars, group ));
             // todo: check inputs
             if (!string.IsNullOrEmpty(group.Extends))
             {
@@ -398,7 +398,7 @@ namespace Hl7.Fhir.MappingLanguage
 
         private void executeRule(string indent, TransformContext context, StructureMap map, Variables vars, StructureMap.GroupComponent group, StructureMap.RuleComponent rule, bool atRoot)
         {
-            log("debug", () => new LogMessage(indent + "rule : " + rule.Name + "; vars = " + vars.summary(), vars, rule));
+            log("debug", () => new LogMessage(indent + "rule : " + rule.Name /*+ "; vars = " + vars.summary()*/, vars, rule));
             if (rule.Source.Count() == 0)
                 throw new FHIRException("Rule \"" + rule.Name + "\": has no sources to execute from");
             if (rule.Source.Count() > 1)

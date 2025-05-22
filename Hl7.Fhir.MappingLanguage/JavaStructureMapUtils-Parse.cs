@@ -1372,8 +1372,8 @@ namespace Hl7.Fhir.MappingLanguage
                 target.Element = lexer.take();
                 if (target.Element.StartsWith("`"))
                     target.Element = lexer.processConstant(target.Element);
+				targetElementNode.TagEnd(target.ElementElement, lexer);
 			}
-			targetElementNode.TagEnd(target.ElementElement, lexer);
 
 			string name;
             bool isConstant = false;

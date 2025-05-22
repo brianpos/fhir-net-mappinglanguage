@@ -73,8 +73,8 @@ namespace Hl7.Fhir.MappingLanguage
 			target.SetAnnotation(this);
 
 			// And put it temporarily into an extension
-			target.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Location",
-				$"L{StartLoc?.getLine()} C{StartLoc?.getColumn()} - L{EndLoc.getLine()} C{EndLoc.getColumn()}");
+			//target.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Location",
+			//	$"L{StartLoc?.getLine()} C{StartLoc?.getColumn()} - L{EndLoc.getLine()} C{EndLoc.getColumn()}");
 			target.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Cursor",
 				$"{StartCursor} - {EndCursor}");
 		}
@@ -554,10 +554,12 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
-                if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
+				var vars = new StructureMapUtilitiesAnalyze.Variables();
+				vars.add(new StructureMapUtilitiesAnalyze.Variable(StructureMapUtilitiesAnalyze.VariableMode.OUTPUT, name.Value, value));
+				if (Property.isPrimitive(en.InstanceType) && value.Name == "@primitivevalue@")
                 {
                     // this is a primitive element
-                    Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive", null, name));
+                    Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value}'({value.InstanceType}) - primitive", vars, name));
                     en.Value = value.Value;
                     return en;
                 }
@@ -591,13 +593,13 @@ namespace Hl7.Fhir.MappingLanguage
 										// set the primitive value inside
                                         var existingValues = en[name.Value];
                                         existingValues[0].Value = value.Value;
-										Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{existingValues[0].Value}'({existingValues[0].InstanceType}) - replace primitive", null, name));
+										Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{existingValues[0].Value}'({existingValues[0].InstanceType}) - replace primitive", vars, name));
 										return existingValues[0];
 									}
-									Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", null, name));
+									Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", vars, name));
 								}
 
-								Log("prop", () => new LogMessage($"Replacing an existing node at {me.Location}.{name}", null, name));
+								Log("prop", () => new LogMessage($"Replacing an existing node at {me.Location}.{name}", vars, name));
                                 en.Replace(pkp, me.Children(name.Value).First() as ElementNode, ne);
                                 return ne;
                             }
@@ -612,14 +614,14 @@ namespace Hl7.Fhir.MappingLanguage
                                 var result = makeProperty(en, Log, pkp, name) as ElementNode;
 								// and set the primitive value inside
 								result.Value = value.Value;
-								Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{result.Value}'({result.InstanceType}) - primitive", null, name));
+								Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{result.Value}'({result.InstanceType}) - primitive", vars, name));
 								return result;
 							}
-							Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", null, name));
+							Log("warning", () => new LogMessage($"Node {me.Location}.{name} requires type co-ersion from {value.InstanceType} to {string.Join(",", cd.Type.Select(t => t.GetTypeName()))}", vars, name));
                         }
                     }
                 }
-                Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})", null, name));
+                Log("prop", () => new LogMessage($"SetProp {me.Location}.{name} with '{value.Value?.DebuggerDisplayString() ?? value.Value?.ToString()}'({value.InstanceType})", vars, name));
                 return en.Add(pkp, ne, name.Value);
                 // return en.Add(pkp, name, value.Value, value.InstanceType);
             }
@@ -630,7 +632,10 @@ namespace Hl7.Fhir.MappingLanguage
         {
             if (me is ElementNode en)
             {
-                Log("prop", () => new LogMessage($"MakeProp {name.Value} context: {me.Location}", null, name));
+				var vars = new StructureMapUtilitiesAnalyze.Variables();
+				vars.add(new StructureMapUtilitiesAnalyze.Variable(StructureMapUtilitiesAnalyze.VariableMode.OUTPUT, name.Value, me));
+
+				Log("prop", () => new LogMessage($"MakeProp {name.Value} context: {me.Location}", vars, name));
                 var result = en.Add(pkp, name.Value);
                 return result;
             }
