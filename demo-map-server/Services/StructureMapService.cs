@@ -313,23 +313,42 @@ namespace demo_map_server.Services
 								foreach (var v in log.Value.vars.All())
 								{
 									// Stash either the value (primitive) or the location of the property via its short path
-									var value = v.getObject();
-									var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
-									extValue.SetStringExtension("name-" + v.Mode, v.Name);
-									part.Extension.Add(extValue);
+									var value2 = v.getObject();
+									if (value2 is IEnumerable<ITypedElement> vc)
+									{
+										foreach (var value in vc)
+										{
+											var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
+											extValue.SetStringExtension("name-" + v.Mode, v.Name);
+											part.Extension.Add(extValue);
 
-									if (value is IShortPathGenerator spg)
-									{
-										extValue.SetStringExtension("path", spg.ShortPath);
-									}
-									else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
-									{
-										extValue.SetExtension("value", dt);
-									}
-									else
-									{
-										// constant values?
-
+											if (value is IShortPathGenerator spg)
+											{
+												extValue.SetStringExtension("path", spg.ShortPath);
+												if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
+												{
+													extValue.SetExtension("value", dt);
+												}
+											}
+											else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
+											{
+												extValue.SetExtension("value", dt);
+											}
+											else if (value is FhirJsonNode fjn)
+											{
+												if (!string.IsNullOrEmpty(fjn.Location))
+												{
+													extValue.SetStringExtension("path", fjn.Location);
+												}
+											}
+											else if (value?.Name == "@primitivevalue@")
+											{
+												// constant values?
+												var constant = ElementNavFhirExtensions.ToFhirValues([value]).FirstOrDefault();
+												if (constant is DataType dtValue)
+													extValue.Value = dtValue;
+											}
+										}
 									}
 								}
 							}
