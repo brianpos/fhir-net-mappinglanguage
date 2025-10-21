@@ -317,38 +317,14 @@ namespace demo_map_server.Services
 									if (value2 is IEnumerable<ITypedElement> vc)
 									{
 										foreach (var value in vc)
-										{
-											var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
-											extValue.SetStringExtension("name-" + v.Mode, v.Name);
-											part.Extension.Add(extValue);
-
-											if (value is IShortPathGenerator spg)
-											{
-												extValue.SetStringExtension("path", spg.ShortPath);
-												if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
-												{
-													extValue.SetExtension("value", dt);
-												}
-											}
-											else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
-											{
-												extValue.SetExtension("value", dt);
-											}
-											else if (value is FhirJsonNode fjn)
-											{
-												if (!string.IsNullOrEmpty(fjn.Location))
-												{
-													extValue.SetStringExtension("path", fjn.Location);
-												}
-											}
-											else if (value?.Name == "@primitivevalue@")
-											{
-												// constant values?
-												var constant = ElementNavFhirExtensions.ToFhirValues([value]).FirstOrDefault();
-												if (constant is DataType dtValue)
-													extValue.Value = dtValue;
-											}
-										}
+                                        {
+                                            LogVariable(part, v, value);
+                                        }
+                                    }
+									// handle if the value isn't a collection too (the old way)
+									if (value2 is ITypedElement vi)
+									{
+										LogVariable(part, v, vi);
 									}
 								}
 							}
@@ -373,17 +349,51 @@ namespace demo_map_server.Services
 			return outcome;
 		}
 
-		/// <summary>
-		/// Retrieve the Input Resource from the input parameters
-		/// </summary>
-		/// <remarks>
-		/// If the resource is native to the bundle, and not parsed from a string, then the inputFormatIsJson
-		/// value is not changed - that should be whatever the bundle coming in is.
-		/// </remarks>
-		/// <param name="operationParameters"></param>
-		/// <param name="inputFormatIsJson"></param>
-		/// <returns></returns>
-		private static ITypedElement GetInputResource(Parameters operationParameters, IStructureDefinitionSummaryProvider provider, ref bool inputFormatIsJson)
+        private static void LogVariable(Parameters.ParameterComponent part, StructureMapUtilitiesAnalyze.Variable v, ITypedElement value)
+        {
+            var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
+            extValue.SetStringExtension("name-" + v.Mode, v.Name);
+            part.Extension.Add(extValue);
+
+            if (value is IShortPathGenerator spg)
+            {
+                extValue.SetStringExtension("path", spg.ShortPath);
+                if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
+                {
+                    extValue.SetExtension("value", dt);
+                }
+            }
+            else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
+            {
+                extValue.SetExtension("value", dt);
+            }
+            else if (value is FhirJsonNode fjn)
+            {
+                if (!string.IsNullOrEmpty(fjn.Location))
+                {
+                    extValue.SetStringExtension("path", fjn.Location);
+                }
+            }
+            else if (value?.Name == "@primitivevalue@")
+            {
+                // constant values?
+                var constant = ElementNavFhirExtensions.ToFhirValues([value]).FirstOrDefault();
+                if (constant is DataType dtValue)
+                    extValue.Value = dtValue;
+            }
+        }
+
+        /// <summary>
+        /// Retrieve the Input Resource from the input parameters
+        /// </summary>
+        /// <remarks>
+        /// If the resource is native to the bundle, and not parsed from a string, then the inputFormatIsJson
+        /// value is not changed - that should be whatever the bundle coming in is.
+        /// </remarks>
+        /// <param name="operationParameters"></param>
+        /// <param name="inputFormatIsJson"></param>
+        /// <returns></returns>
+        private static ITypedElement GetInputResource(Parameters operationParameters, IStructureDefinitionSummaryProvider provider, ref bool inputFormatIsJson)
 		{
 			if (operationParameters["resource"]?.Resource != null)
 				return operationParameters["resource"]?.Resource.ToTypedElement();
