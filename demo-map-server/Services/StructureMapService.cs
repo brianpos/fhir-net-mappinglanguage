@@ -284,7 +284,7 @@ namespace demo_map_server.Services
 					// Any processing parameters
 					// (including the map that was used to evaluate the request - in StructureMap format)
 					var configParams = new Parameters.ParameterComponent() { Name = "parameters" };
-					configParams.Part.Add(new Parameters.ParameterComponent() { Name = "evaluator", Value = new FhirString(".NET (brianpos) 5.12.1 beta-1") });
+					configParams.Part.Add(new Parameters.ParameterComponent() { Name = "evaluator", Value = new FhirString(".NET (brianpos) 5.12.1 beta-2") });
 					configParams.Part.Add(new Parameters.ParameterComponent() { Name = "map", Resource = sm });
 					result.Parameter.Add(configParams);
 
