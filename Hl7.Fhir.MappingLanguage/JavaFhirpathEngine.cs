@@ -1275,4 +1275,76 @@ namespace Hl7.Fhir.MappingLanguage
                 result.addType(TypeDetails.FP_String);
         }
     }
+
+
+	public class FmlVariableFixerExpressionVisitor : ExpressionVisitor<Hl7.FhirPath.Expressions.Expression>
+	{
+		public FmlVariableFixerExpressionVisitor(Variables vars)
+		{
+            _vars = vars;
+		}
+
+        Variables _vars;
+
+		private readonly Stack<string> _stackPropertyContext = new();
+
+		public override Hl7.FhirPath.Expressions.Expression VisitFunctionCall(FunctionCallExpression expression)
+		{
+			var focus = expression.Focus.Accept(this);
+
+			// Special case for property accessors
+			if (expression is ChildExpression ce)
+			{
+                bool reWriteVariable = false;
+				if (!_stackPropertyContext.Any())
+				{
+					// Check if this is a variable, and swap that in
+					// Do a check to see if this property exists as a variable that it could be using, and include that in the diagnostics as something it might be
+					if (_vars.ContainsKey(ce.ChildName))
+					{
+						System.Diagnostics.Trace.WriteLine($"Updating %{ce.ChildName}");
+						reWriteVariable = true;
+					}
+				}
+				_stackPropertyContext.Push(ce.ChildName);
+
+				List<Hl7.FhirPath.Expressions.Expression> arguments = new();
+				foreach (var arg in ce.Arguments)
+				{
+					arguments.Add(arg.Accept(this));
+				}
+				if (_stackPropertyContext.Count > 0)
+					_stackPropertyContext.Pop();
+                if (reWriteVariable)
+                {
+                    return new VariableRefExpression(ce.ChildName);
+                    // return new ChildExpression(focus, "%" + ce.ChildName);
+                }
+				return ce;
+			}
+
+			// Everything else
+			foreach (var arg in expression.Arguments)
+			{
+				arg.Accept(this);
+			}
+
+			return expression;
+		}
+
+		public override Hl7.FhirPath.Expressions.Expression VisitConstant(ConstantExpression expression)
+		{
+            return expression;
+		}
+
+		public override Hl7.FhirPath.Expressions.Expression VisitNewNodeListInit(NewNodeListInitExpression expression)
+		{
+			return expression;
+		}
+
+		public override Hl7.FhirPath.Expressions.Expression VisitVariableRef(VariableRefExpression expression)
+		{
+            return expression;
+		}
+	}
 }
