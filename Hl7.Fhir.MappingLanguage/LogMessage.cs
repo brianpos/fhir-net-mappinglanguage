@@ -27,17 +27,25 @@
 
 */
 
+using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.FhirPath;
+using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
-using Microsoft.CodeAnalysis.Operations;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Hl7.Fhir.MappingLanguage
 {
 	public record LogMessage
 	{
-		public LogMessage(string message, StructureMapUtilitiesAnalyze.Variables vars = null, IAnnotated sourceLocation = null)
+		public LogMessage(string message, StructureMapUtilitiesAnalyze.Variables vars, IAnnotated sourceLocation = null)
 		{
 			this.message = message;
-			this.vars = vars;
+			variables = vars?.All()
+				.SelectMany(variable => variable.getObject()
+					.Where(value => value != null)
+					.Select(value => new LogMessageVariable(variable.Mode, variable.Name, GetPath(value), value.InstanceType, GetValue(value))))
+				.ToList() ?? new List<LogMessageVariable>();
 
 			if (sourceLocation?.HasAnnotation<DebugAnnotation>() == true)
 			{
@@ -45,8 +53,40 @@ namespace Hl7.Fhir.MappingLanguage
 			}
 		}
 
+		private static string GetPath(ITypedElement value)
+		{
+			if (value is IShortPathGenerator shortPathGenerator)
+				return shortPathGenerator.ShortPath;
+			if (value is FhirJsonNode jsonNode)
+				return jsonNode.Location;
+			return null;
+		}
+
+		private static string GetValue(ITypedElement value)
+		{
+			return value.Value?.ToString() ?? value.ToJson();
+		}
+
 		public string message;
-		public StructureMapUtilitiesAnalyze.Variables vars;
+		public IReadOnlyList<LogMessageVariable> variables;
 		public DebugAnnotation debugAnnotation;
+	}
+
+	public class LogMessageVariable
+	{
+		public LogMessageVariable(StructureMapUtilitiesAnalyze.VariableMode mode, string name, string path, string type, string value)
+		{
+			Mode = mode;
+			Name = name;
+			Path = path;
+            Type = type;
+			Value = value;
+		}
+
+		public StructureMapUtilitiesAnalyze.VariableMode Mode { get; }
+		public string Name { get; }
+		public string Path { get; }
+        public string Type { get; }
+        public string Value { get; }
 	}
 }

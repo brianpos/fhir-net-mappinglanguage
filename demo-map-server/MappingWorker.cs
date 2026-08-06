@@ -12,13 +12,15 @@ namespace demo_map_server
 {
     public class MappingWorker : IWorkerContext
     {
-        StructureMapService _service;
-        IResourceResolver _source;
+        private readonly StructureMapService _service;
+        private readonly IResourceResolver _source;
+        private readonly IReadOnlyList<StructureMap> _suppliedMaps;
 
-        public MappingWorker(StructureMapService service, IResourceResolver source)
+        public MappingWorker(StructureMapService service, IResourceResolver source, IEnumerable<StructureMap> suppliedMaps = null)
         {
             _service = service;
             _source = source;
+            _suppliedMaps = suppliedMaps?.ToList() ?? new List<StructureMap>();
         }
 
         public ValueSet.ExpansionComponent expandVS(ValueSet vs, bool v1, bool v2)
@@ -74,32 +76,39 @@ namespace demo_map_server
         /// <returns></returns>
         public StructureMap getTransform(string canonicalUrl)
         {
+            CanonicalUrl requestedCanonical = new CanonicalUrl(canonicalUrl);
+            var suppliedMatches = _suppliedMaps.Where(map => map.Url == requestedCanonical.Url.Value);
+            if (requestedCanonical.Version != null)
+                suppliedMatches = suppliedMatches.Where(map => map.Version == requestedCanonical.Version.Value);
+
+            var suppliedMap = CurrentCanonical.Current(suppliedMatches.Cast<IVersionableConformanceResource>()) as StructureMap;
+            if (suppliedMap != null)
+                return suppliedMap;
+
             var kvps = new List<KeyValuePair<string, string>>();
-            CanonicalUrl sm = new CanonicalUrl(canonicalUrl);
-            kvps.Add(new KeyValuePair<string, string>("url", sm.Url.Value));
-            if (sm.Version != null)
-                kvps.Add(new KeyValuePair<string, string>("url", sm.Url.Value));
+            kvps.Add(new KeyValuePair<string, string>("url", requestedCanonical.Url.Value));
+            if (requestedCanonical.Version != null)
+                kvps.Add(new KeyValuePair<string, string>("url", requestedCanonical.Version.Value));
             var content = _service.Search(kvps, null, SummaryType.False, null).WaitResult();
             return CurrentCanonical.Current(content.Entry.Where(e => e.Resource is StructureMap).Select(e => e.Resource as StructureMap)) as StructureMap;
         }
 
         public IEnumerable<StructureMap> listTransforms(string canonicalUrlTemplate)
         {
+            var maps = _suppliedMaps.Where(map => !string.IsNullOrEmpty(map.Url) && urlMatches(canonicalUrlTemplate, map.Url)).ToList();
+            var suppliedUrls = maps.Select(map => map.Url).ToHashSet();
             if (_service.Indexer.MemoryIndex.ContainsKey("StructureMap#url"))
             {
                 var map = _service.Indexer.MemoryIndex["StructureMap#url"];
-                List<StructureMap> maps = new List<StructureMap>();
                 foreach (var kvp in map)
-                { 
-                    if (urlMatches(canonicalUrlTemplate, kvp.Key))
+                {
+                    if (urlMatches(canonicalUrlTemplate, kvp.Key) && !suppliedUrls.Contains(kvp.Key))
                     {
                         maps.Add(new FhirXmlParser().Parse<StructureMap>(File.ReadAllText(kvp.Value.First())));
                     }
                 }
-                return maps;
-
             }
-            return null;
+            return maps;
         }
 
         private bool urlMatches(string mask, string url)

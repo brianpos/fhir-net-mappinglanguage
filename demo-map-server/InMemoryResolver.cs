@@ -1,34 +1,30 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification.Source;
-using System.Resources;
 
 namespace demo_map_server
 {
 	public class InMemoryResolver : IResourceResolver
 	{
-		Dictionary<string, StructureDefinition> _structureDefinitions = new();
+		private readonly Dictionary<string, Resource> _resources = new();
 
-		public void Add(StructureDefinition definition)
+		public void Add(IConformanceResource resource)
 		{
-			string canonicalUrl = definition.Url;
-			if (!string.IsNullOrEmpty(canonicalUrl))
-			{
-				if (!_structureDefinitions.ContainsKey(canonicalUrl))
-					_structureDefinitions.Add(canonicalUrl, definition);
-				else
-					_structureDefinitions[canonicalUrl] = definition;
-			}
+			if (resource is not Resource fhirResource || string.IsNullOrEmpty(resource.Url))
+				return;
+
+			_resources[resource.Url] = fhirResource;
+			if (resource is IVersionableConformanceResource versionable && !string.IsNullOrEmpty(versionable.Version))
+				_resources[$"{resource.Url}|{versionable.Version}"] = fhirResource;
 		}
+
 		public Resource ResolveByCanonicalUri(string uri)
 		{
-            if (_structureDefinitions.ContainsKey(uri))
-				return _structureDefinitions[uri];
-            return null;
+			return _resources.TryGetValue(uri, out var resource) ? resource : null;
 		}
 
 		public Resource ResolveByUri(string uri)
 		{
-			return null;
+			return ResolveByCanonicalUri(uri);
 		}
 	}
 }

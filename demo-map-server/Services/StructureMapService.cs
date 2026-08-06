@@ -18,6 +18,8 @@ namespace demo_map_server.Services
 {
 	public class StructureMapService : Hl7.Fhir.DemoFileSystemFhirServer.DirectoryResourceService<IServiceProvider>, IFhirResourceServiceR4<IServiceProvider>
 	{
+		private const string OperationOutcomeFileExtension = "http://hl7.org/fhir/StructureDefinition/operationoutcome-file";
+
 		public StructureMapService(ModelBaseInputs<IServiceProvider> requestDetails, string resourceName, string directory, IResourceResolver Source, IAsyncResourceResolver AsyncSource)
 			: base(requestDetails, resourceName, directory, Source, AsyncSource)
 		{
@@ -68,9 +70,13 @@ namespace demo_map_server.Services
 				case "transform":
 					// The provided resource is the input to the transformation process (will be in `resource` here)
 
-					// We need to inject the "map" into the parameters for the other operation
+					// The instance map is primary; request maps remain available as supporting imports.
 					var resource = await Get(id, null, SummaryType.False);
-					operationParameters.Add("map", resource);
+					operationParameters.Parameter.Insert(0, new Parameters.ParameterComponent
+					{
+						Name = "map",
+						Resource = resource
+					});
 					return await PerformOperation_Transform(operationParameters, summary);
 			}
 			return await base.PerformOperation(id, operation, operationParameters, summary);
@@ -82,32 +88,60 @@ namespace demo_map_server.Services
 			bool inputFormatIsJson = false;
 			var ct = RequestDetails.Headers.FirstOrDefault(h => h.Key.Equals("content-type", StringComparison.OrdinalIgnoreCase));
 			{
-				if (ct.Value.Any(v => v.Contains("json", StringComparison.OrdinalIgnoreCase)))
+				if (ct.Value?.Any(v => v.Contains("json", StringComparison.OrdinalIgnoreCase)) == true)
 					inputFormatIsJson = true;
 			}
-			StructureMap sm = operationParameters["map"]?.Resource as StructureMap;
-			if (operationParameters["map"]?.Value is FhirString mapString)
-			{
-				// This is a workaround to support passing the raw map as a string as a resource parameter
-				try
-				{
-					var parser = new StructureMapUtilitiesParse();
-					sm = parser.parse(mapString.Value, "map");
-				}
-				catch (Exception ex)
-				{
-					outcome.Issue.Add(new OperationOutcome.IssueComponent()
-					{
-						Code = OperationOutcome.IssueType.Exception,
-						Severity = OperationOutcome.IssueSeverity.Error,
-						Details = new CodeableConcept(null, null, "Error parsing the map to transform with"),
-						Diagnostics = ex.Message
-					});
+			var mapParameters = operationParameters.Parameter.Where(p => p.Name == "map").ToList();
+			var suppliedMaps = new List<StructureMap>();
+			string primaryMapFile = mapParameters.FirstOrDefault()?.GetStringExtension(OperationOutcomeFileExtension);
+			StructureMap sm = null;
 
+			foreach (var mapParameter in mapParameters)
+			{
+				StructureMap suppliedMap = mapParameter.Resource as StructureMap;
+				string mapFile = mapParameter.GetStringExtension(OperationOutcomeFileExtension);
+
+				if (mapParameter.Value is FhirString mapString)
+				{
+					// This is a workaround to support passing the raw map as a string as a resource parameter.
+					try
+					{
+						var parser = new StructureMapUtilitiesParse();
+						suppliedMap = parser.parse(mapString.Value, mapFile ?? "map");
+					}
+					catch (Exception ex)
+					{
+						var issue = new OperationOutcome.IssueComponent()
+						{
+							Code = OperationOutcome.IssueType.Exception,
+							Severity = OperationOutcome.IssueSeverity.Error,
+							Details = new CodeableConcept(null, null, "Error parsing the map to transform with"),
+							Diagnostics = ex.Message
+						};
+						SetIssueFile(issue, mapFile);
+						outcome.Issue.Add(issue);
+					}
+				}
+
+				if (suppliedMap != null)
+				{
+					suppliedMaps.Add(suppliedMap);
+					if (ReferenceEquals(mapParameter, mapParameters[0]))
+						sm = suppliedMap;
 				}
 			}
 
-			if (sm == null)
+			if (sm == null && mapParameters.Count > 0 && outcome.Success)
+			{
+				outcome.Issue.Add(new OperationOutcome.IssueComponent()
+				{
+					Code = OperationOutcome.IssueType.Incomplete,
+					Severity = OperationOutcome.IssueSeverity.Error,
+					Details = new CodeableConcept(null, null, "The first map parameter is not a valid StructureMap")
+				});
+			}
+
+			if (sm == null && mapParameters.Count == 0)
 			{
 				// Check for the source parameter to resolve
 				var sourceParams = operationParameters.Parameter.Where(p => p.Name == "source");
@@ -151,6 +185,7 @@ namespace demo_map_server.Services
 
 			if (!outcome.Success)
 			{
+				ApplyIssueFile(outcome, primaryMapFile);
 				outcome.SetAnnotation(HttpStatusCode.BadRequest);
 				return outcome;
 			}
@@ -158,14 +193,18 @@ namespace demo_map_server.Services
 			try
 			{
 				var imr = new InMemoryResolver();
+				foreach (var suppliedMap in suppliedMaps)
+				{
+					imr.Add(suppliedMap);
+				}
 				foreach (var sd in CustomStructureDefinitions(Source, operationParameters))
 				{
 					imr.Add(sd);
 				}
 				var mr = new MultiResolver(imr, Source);
-				var worker = new MappingWorker(this, mr);
+				var worker = new MappingWorker(this, mr, suppliedMaps);
 
-				// Scan the map for required structuredefinitions for source types
+				// Scan the map for required StructureDefinitions for source types
 				// (source while parsing the source content, switches to target content once it's loaded)
 				var mapCanonicalsSource = StructureMapUtilitiesExecute.getSourceCanonicalTypeMapping(worker, sm);
 
@@ -308,29 +347,14 @@ namespace demo_map_server.Services
 							//	$"L{debugAnnot.StartLoc?.getLine()} C{debugAnnot.StartLoc?.getColumn()} - L{debugAnnot.EndLoc.getLine()} C{debugAnnot.EndLoc.getColumn()}");
 							part.SetStringExtension("http://fhirpath-lab.com/StructureDefinition/Cursor",
 								$"{debugAnnot.StartCursor} - {debugAnnot.EndCursor}");
-							if (log.Value.vars != null)
+							foreach (var variable in log.Value.variables)
 							{
-								foreach (var v in log.Value.vars.All())
-								{
-									// Stash either the value (primitive) or the location of the property via its short path
-									var value2 = v.getObject();
-									if (value2 is IEnumerable<ITypedElement> vc)
-									{
-										foreach (var value in vc)
-                                        {
-                                            LogVariable(part, v, value);
-                                        }
-                                    }
-									// handle if the value isn't a collection too (the old way)
-									if (value2 is ITypedElement vi)
-									{
-										LogVariable(part, v, vi);
-									}
-								}
+								LogVariable(part, variable);
 							}
 						}
 						resultTrace.Part.Add(part);
 					}
+					ApplyIssueFile(outcome, primaryMapFile);
 					return result;
 				}
 				outcome.SetAnnotation(new StructureMapTransformOutput() { OutputContent = target });
@@ -346,42 +370,39 @@ namespace demo_map_server.Services
 				});
 			}
 
+			ApplyIssueFile(outcome, primaryMapFile);
 			return outcome;
 		}
 
-        private static void LogVariable(Parameters.ParameterComponent part, StructureMapUtilitiesAnalyze.Variable v, ITypedElement value)
-        {
-            var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
-            extValue.SetStringExtension("name-" + v.Mode, v.Name);
-            part.Extension.Add(extValue);
+		private static void ApplyIssueFile(OperationOutcome outcome, string fileName)
+		{
+			if (string.IsNullOrEmpty(fileName))
+				return;
 
-            if (value is IShortPathGenerator spg)
-            {
-                extValue.SetStringExtension("path", spg.ShortPath);
-                if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
-                {
-                    extValue.SetExtension("value", dt);
-                }
-            }
-            else if (value is IFhirValueProvider fvp && fvp.FhirValue is DataType dt)
-            {
-                extValue.SetExtension("value", dt);
-            }
-            else if (value is FhirJsonNode fjn)
-            {
-                if (!string.IsNullOrEmpty(fjn.Location))
-                {
-                    extValue.SetStringExtension("path", fjn.Location);
-                }
-            }
-            else if (value?.Name == "@primitivevalue@")
-            {
-                // constant values?
-                var constant = ElementNavFhirExtensions.ToFhirValues([value]).FirstOrDefault();
-                if (constant is DataType dtValue)
-                    extValue.Value = dtValue;
-            }
-        }
+			foreach (var issue in outcome.Issue.Where(i => i.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal))
+			{
+				if (string.IsNullOrEmpty(issue.GetStringExtension(OperationOutcomeFileExtension)))
+					SetIssueFile(issue, fileName);
+			}
+		}
+
+		private static void SetIssueFile(OperationOutcome.IssueComponent issue, string fileName)
+		{
+			if (!string.IsNullOrEmpty(fileName))
+				issue.SetStringExtension(OperationOutcomeFileExtension, fileName);
+		}
+
+		private static void LogVariable(Parameters.ParameterComponent part, LogMessageVariable variable)
+		{
+			var extValue = new Extension() { Url = "http://fhirpath-lab.com/StructureDefinition/Variable" };
+			extValue.SetStringExtension("name-" + variable.Mode, variable.Name);
+			if (!string.IsNullOrEmpty(variable.Path))
+				extValue.SetStringExtension("path", variable.Path);
+            if (!string.IsNullOrEmpty(variable.Type))
+                extValue.SetStringExtension("type", variable.Type);
+            extValue.SetStringExtension("value", variable.Value);
+            part.Extension.Add(extValue);
+		}
 
         /// <summary>
         /// Retrieve the Input Resource from the input parameters

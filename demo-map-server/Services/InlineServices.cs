@@ -45,7 +45,7 @@ namespace demo_map_server.Services
         {
 			var result = message();
             if (DebugMode || category == "error")
-                LogMessages.Add(new KeyValuePair<string, LogMessage>(category, new LogMessage(result)));
+                LogMessages.Add(new KeyValuePair<string, LogMessage>(category, new LogMessage(result, null)));
 
             if (category == "error")
             {
