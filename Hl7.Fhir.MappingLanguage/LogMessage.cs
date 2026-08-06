@@ -42,9 +42,9 @@ namespace Hl7.Fhir.MappingLanguage
 		{
 			this.message = message;
 			variables = vars?.All()
-				.SelectMany(variable => variable.getObject()
-					.Where(value => value != null)
-					.Select(value => new LogMessageVariable(variable.Mode, variable.Name, GetPath(value), value.InstanceType, GetValue(value))))
+				.Select(variable => new { variable, value = variable.getObject() })
+				.Where(item => item.value != null)
+				.Select(item => new LogMessageVariable(item.variable.Mode, item.variable.Name, GetPath(item.value), item.value.InstanceType, GetValue(item.value)))
 				.ToList() ?? new List<LogMessageVariable>();
 
 			if (sourceLocation?.HasAnnotation<DebugAnnotation>() == true)
