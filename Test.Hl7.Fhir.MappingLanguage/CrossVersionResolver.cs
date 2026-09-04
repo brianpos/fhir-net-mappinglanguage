@@ -248,7 +248,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
 			else if (cu.Version() == "5.0")
 				result = r5.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
 			else
-				result = fallbackResolver.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
+				result = fallbackResolver?.ResolveByCanonicalUri(cu.BaseCanonicalUrl());
             if (result == null)
             {
                 System.Diagnostics.Trace.WriteLine($"Failed to resolve: {uri} at [{cu.Version()}] {cu.BaseCanonicalUrl()}");

@@ -39,6 +39,11 @@ namespace Test.FhirMappingLanguage
 			(_sourceR5 as CachedResolver).Load += Source_Load;
 		}
 
+        void SetFallbackResolver(IResourceResolver resolver)
+        {
+            ((_source as CachedResolver).Source as CrossVersionResolver).fallbackResolver = resolver;
+        }
+
 		private void Source_Load(object sender, CachedResolver.LoadResourceEventArgs e)
         {
             if (e.Resource is IConformanceResource cr)
@@ -256,6 +261,7 @@ namespace Test.FhirMappingLanguage
             var services4to3 = new UnitTestFmlEngineServices(providerR3);
             var engine3to4 = new StructureMapUtilitiesExecute(workerR3toR4, services3to4, providerR4);
             var engine4to3 = new StructureMapUtilitiesExecute(workerR4toR3, services4to3, providerR3);
+            SetFallbackResolver(_sourceR4);
 
             var validator = new Validator(new ValidationSettings() { ResourceResolver = _source });
 
@@ -388,6 +394,7 @@ namespace Test.FhirMappingLanguage
             IStructureDefinitionSummaryProvider providerTarget = new StructureDefinitionSummaryProvider(_sourceR3);
             var services = new UnitTestFmlEngineServices(providerTarget);
             var engine = new StructureMapUtilitiesExecute(workerR4toR3, services, providerTarget);
+            SetFallbackResolver(_sourceR3);
 
             // scan all the files in the zip
             int filesProcessed = 0;

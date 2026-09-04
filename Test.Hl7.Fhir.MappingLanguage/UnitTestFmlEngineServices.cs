@@ -86,7 +86,10 @@ namespace Test.FhirMappingLanguage
 
         public Coding translate(object appInfo, Coding source, string conceptMapUrl)
         {
-            throw new NotImplementedException();
+            // for unit testing, just return the same coding, but a real implementation will need to actually use the conceptmap
+            Console.WriteLine($"Translate {source.System}#{source.Code} using {conceptMapUrl}");
+            return source;
+            // throw new NotImplementedException();
         }
     }
 }
