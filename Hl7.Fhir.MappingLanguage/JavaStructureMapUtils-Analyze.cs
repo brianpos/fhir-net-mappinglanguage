@@ -42,6 +42,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using static Hl7.Fhir.MappingLanguage.FHIRPathEngineOriginal; // for the IEvaluationContext
 using static Hl7.Fhir.MappingLanguage.TypeDetails;
 
@@ -75,6 +76,7 @@ namespace Hl7.Fhir.MappingLanguage
             //    public bool validateByValueSet(Coding code, string valuesetId);
             public void log(string category, Func<string> message); // log internal progress
 			public void log(string category, Func<LogMessage> message); // log internal progress
+
 			public ITypedElement createType(Object appInfo, string name);
             public ITypedElement createResource(Object appInfo, ITypedElement res, bool atRootofTransform); // an already created resource is provided; this is to identify/store it
             public Coding translate(Object appInfo, Coding source, string conceptMapUrl);
@@ -93,13 +95,15 @@ namespace Hl7.Fhir.MappingLanguage
             public List<ITypedElement> resolveConstant(Object appContext, string name, bool beforeContext)
             {
                 Variables vars = (Variables)appContext;
-                ITypedElement res = vars.getInputVar(name);
-                if (res == null)
-                    res = vars.getOutputVar(name);
-                List<ITypedElement> result = new List<ITypedElement>();
-                if (res != null)
-                    result.Add(res);
-                return result;
+				List<ITypedElement> result = new List<ITypedElement>();
+				result.AddRange(vars.getInputVar(name));
+                if (!result.Any())
+				{
+					var res = vars.getOutputVar(name);
+					if (res != null)
+						result.Add(res);
+				}
+				return result;
             }
 
             // @Override
@@ -253,15 +257,22 @@ namespace Hl7.Fhir.MappingLanguage
 
 			private VariableMode _mode;
             private string _name;
-            private ITypedElement _object;
+            private IEnumerable<ITypedElement> _object;
             public Variable(VariableMode mode, string name, ITypedElement obj)
             {
 
                 this._mode = mode;
                 this._name = name;
-                this._object = obj;
+                this._object = new [] { obj };
             }
-            public VariableMode Mode
+			public Variable(VariableMode mode, string name, IEnumerable<ITypedElement> obj)
+			{
+
+				this._mode = mode;
+				this._name = name;
+				this._object = obj;
+			}
+			public VariableMode Mode
             {
                 get { return _mode; }
             }
@@ -272,23 +283,28 @@ namespace Hl7.Fhir.MappingLanguage
                     return _name;
                 }
             }
-            public ITypedElement getObject()
+            public IEnumerable<ITypedElement> getObject()
             {
                 return _object;
             }
             public string summary()
             {
-                if (_object == null)
-                    return null;
-                if (!string.IsNullOrEmpty(_object.InstanceType) && ModelInfo.IsPrimitive(_object.InstanceType))
-                    return _name + ": \"" + _object.Value?.ToString() + '"';
-                string debuggerString = _object.Value?.DebuggerDisplayString();
-                if (!string.IsNullOrEmpty(debuggerString))
-                    return $"{_name}: \"{debuggerString}\"";
-                string json = _object?.ToJson();
-                if (json.Length > 100)
-                    return $"{_name}: {json.Substring(0, 50)}...";
-                return _name + ": (" + json + ")";
+				StringBuilder sb = new StringBuilder();
+				sb.Append(_name);
+				sb.Append(":");
+				sb.Append(String.Join(", ", _object.Select(value =>
+				{
+					if (!string.IsNullOrEmpty(value.InstanceType) && ModelInfo.IsPrimitive(value.InstanceType))
+						return $"\"{value.Value}\"";
+					string debuggerString = value?.DebuggerDisplayString();
+					if (!string.IsNullOrEmpty(debuggerString))
+						return $"\"{debuggerString}\"";
+					string json = value?.ToJson();
+					if (json.Length > 100)
+						return $"{json.Substring(0, 50)}...";
+					return "(" + json + ")";
+				})));
+                return sb.ToString();
             }
         }
 
@@ -330,7 +346,8 @@ namespace Hl7.Fhir.MappingLanguage
 
             public void RemoveAll(Predicate<ITypedElement> match)
             {
-                list.RemoveAll(v => match(v.getObject()));
+				// this will remove any variable that has ANY value that matches (not sure if this is really what's needed)
+				list.RemoveAll(variable => variable.getObject().Any(value => match(value)));
             }
 
             public void add(VariableMode mode, string name, ITypedElement obj)
@@ -351,17 +368,26 @@ namespace Hl7.Fhir.MappingLanguage
                 return result;
             }
 
-            public ITypedElement getInputVar(string name)
+            public IEnumerable<ITypedElement> getInputVar(string name)
             {
                 return get(VariableMode.INPUT, name);
             }
 
-            public ElementNode getOutputVar(string name)
+			public IEnumerable<ITypedElement> getOutputVarAsInput(string name)
+			{
+				return get(VariableMode.OUTPUT, name);
+			}
+
+			public ElementNode getOutputVar(string name)
             {
-                return get(VariableMode.OUTPUT, name) as ElementNode;
+				var values = get(VariableMode.OUTPUT, name);
+				if (values.Count() > 1)
+					throw new PathEngineException($"Variable '{name}' has too many values {values.Count()}");
+				// output vars can only be singular
+				return values.FirstOrDefault() as ElementNode;
             }
 
-            public ITypedElement get(VariableMode mode, string name)
+            public IEnumerable<ITypedElement> get(VariableMode mode, string name)
             {
                 foreach (Variable v in list)
                     if ((v.Mode == mode) && v.Name.Equals(name))
@@ -446,7 +472,7 @@ namespace Hl7.Fhir.MappingLanguage
 			{
 				foreach (var variable in All())
 				{
-					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, new []{ variable.getObject() });
+					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, variable.getObject());
 				}
 			}
 
@@ -454,19 +480,21 @@ namespace Hl7.Fhir.MappingLanguage
 			{
 				foreach (var variable in All())
 				{
-					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, new[] { variable.getObject() });
+					yield return new KeyValuePair<string, IEnumerable<ITypedElement>>(variable.Name, variable.getObject());
 				}
 			}
 		}
 
         public class TransformContext
         {
+            internal DebuggerTrace debuggerTrace;
+
             private Object appInfo;
 
-            public TransformContext(Object appInfo)
+            public TransformContext(Object appInfo, DebuggerTrace? debuggerTrace = null)
             {
-
                 this.appInfo = appInfo;
+                this.debuggerTrace = debuggerTrace;
             }
 
             public Object getAppInfo()
@@ -541,28 +569,28 @@ namespace Hl7.Fhir.MappingLanguage
         }
 
 
-        private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
-        {
-            ITypedElement b = getParam(vars, parameter);
-            if (b is PrimitiveType pt)
-                return pt.ToString();
-            return null;
-        }
+        //private string getParamString(Variables vars, StructureMap.ParameterComponent parameter)
+        //{
+        //    ITypedElement b = getParam(vars, parameter);
+        //    if (b is PrimitiveType pt)
+        //        return pt.ToString();
+        //    return null;
+        //}
 
-        private ITypedElement getParam(Variables vars, StructureMap.ParameterComponent parameter)
-        {
-            var p = parameter.Value as Id;
-            if (p == null)
-                return parameter.Value.ToTypedElement();
+        //private ITypedElement getParam(Variables vars, StructureMap.ParameterComponent parameter)
+        //{
+        //    var p = parameter.Value as Id;
+        //    if (p == null)
+        //        return parameter.Value.ToTypedElement();
 
-            string n = p.Value;
-            ITypedElement b = vars.getInputVar(n);
-            if (b == null)
-                b = vars.getOutputVar(n);
-            if (b == null)
-                throw new DefinitionException("Variable " + n + " not found (" + vars.summary() + ")");
-            return b;
-        }
+        //    string n = p.Value;
+        //    ITypedElement b = vars.getInputVar(n);
+        //    if (b == null)
+        //        b = vars.getOutputVar(n);
+        //    if (b == null)
+        //        throw new DefinitionException("Variable " + n + " not found (" + vars.summary() + ")");
+        //    return b;
+        //}
 
         public class PropertyWithType
         {

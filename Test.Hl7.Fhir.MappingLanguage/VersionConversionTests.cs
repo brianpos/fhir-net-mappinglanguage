@@ -54,92 +54,6 @@ namespace Test.FhirMappingLanguage
 		FhirXmlSerializationSettings _xmlSettings = new FhirXmlSerializationSettings() { Pretty = true };
         FhirJsonSerializationSettings _jsonSettings = new FhirJsonSerializationSettings() { Pretty = true };
 
-        [TestMethod]
-        public async Task PrepareCoreStructureDefinitions()
-        {
-            // Download the cross version packages zip file
-            // http://fhir.org/packages/xver-packages.zip
-            string crossVersionPackages = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "FhirMapper");
-            if (!Directory.Exists(crossVersionPackages))
-                Directory.CreateDirectory(crossVersionPackages);
-
-            string crossVersionPackagesZipFile = Path.Combine(crossVersionPackages, "xver-packages.zip");
-
-            if (!File.Exists(crossVersionPackagesZipFile))
-            {
-                HttpClient server = new HttpClient();
-                var stream = await server.GetStreamAsync("http://fhir.org/packages/xver-packages.zip");
-                using (var outStream = File.OpenWrite(crossVersionPackagesZipFile))
-                {
-                    await stream.CopyToAsync(outStream);
-                    await outStream.FlushAsync();
-                }
-            }
-            
-            using (var zipStream = File.OpenRead(crossVersionPackagesZipFile))
-            {
-                ZipArchive archive = new ZipArchive(zipStream);
-                foreach (var item in archive.Entries)
-                {
-                    if (item.Name.EndsWith(".as.r4b.tgz") && !item.Name.StartsWith("."))
-                    {
-                        System.Diagnostics.Trace.WriteLine($"{item.Name}");
-                        var path = Path.Combine(
-                            crossVersionPackages,
-                            item.Name.Split('.').Skip(2).First());
-                        if (!Directory.Exists(path))
-                            Directory.CreateDirectory(path);
-
-                        // Now extract this package into this folder
-                        using (var tarStream = new GZipStream(item.Open(), CompressionMode.Decompress))
-                        {
-                            TarReader r = new TarReader(tarStream);
-                            var a = await r.GetNextEntryAsync();
-                            while (a != null)
-                            {
-                                if (!a.Name.StartsWith("package/other/")
-                                    && !a.Name.StartsWith("package/openapi/")
-                                    && !a.Name.StartsWith("package/xml/")
-                                    && a.Name != "package/.index.json")
-                                {
-                                    // System.Diagnostics.Trace.WriteLine($"{a.Name}");
-                                    await a.ExtractToFileAsync(Path.Combine(path, a.Name.Replace("package/", "")), true);
-                                }
-                                a = await r.GetNextEntryAsync();
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Instead of modifying the content, have different directory providers
-            var v3 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.core", "3.0.2");
-            var v4 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r4b.core", "4.3.0");
-			var v5 = new Firely.Fhir.Packages.PackageReference("hl7.fhir.r5.core", "5.0.0");
-			var pc = Firely.Fhir.Packages.PackageClient.Create();
-            var cache = new Firely.Fhir.Packages.DiskPackageCache();
-            if (!await cache.IsInstalled(v3))
-            {
-                var pkg = await pc.GetPackage(v3);
-                await cache.Install(v3, pkg);
-            }
-            if (!await cache.IsInstalled(v4))
-            {
-                var pkg = await pc.GetPackage(v4);
-                await cache.Install(v4, pkg);
-            }
-			if (!await cache.IsInstalled(v5))
-			{
-				var pkg = await pc.GetPackage(v5);
-				await cache.Install(v5, pkg);
-			}
-			DirectorySource stu3 = new DirectorySource(cache.PackageContentFolder(v3));
-            DirectorySource r4 = new DirectorySource(cache.PackageContentFolder(v4));
-			DirectorySource r5 = new DirectorySource(cache.PackageContentFolder(v5));
-		}
-
 		[TestMethod]
         public void AnalyzeStructureR3ToR4Map()
         {
@@ -231,12 +145,18 @@ namespace Test.FhirMappingLanguage
             }
         }
 
-		public void ParseAllMaps(string versionMapFolder)
+        /// <summary>
+        /// Parse all the maps in the given folder
+        /// </summary>
+        /// <param name="versionMapFolder"></param>
+        /// <param name="onlyRunFile">Optional parameter to make testing single files across versions quicker during development</param>
+		public void ParseAllMaps(string versionMapFolder, string onlyRunFile = null)
 		{
 			var parser = new StructureMapUtilitiesParse();
 			var xs = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
 			foreach (var filename in Directory.EnumerateFiles(@$"{mappinginterversion_folder}\{versionMapFolder}", "*.fml", SearchOption.AllDirectories))
 			{
+                if (onlyRunFile != null && !filename.EndsWith(onlyRunFile, StringComparison.OrdinalIgnoreCase)) continue;
 				System.Diagnostics.Trace.WriteLine("-----------------------");
 				System.Diagnostics.Trace.WriteLine(filename);
 				var mapText = File.ReadAllText(filename);
@@ -262,27 +182,17 @@ namespace Test.FhirMappingLanguage
 		}
 
 		[TestMethod]
-		public void ParseAllR3toR4Maps()
+		[DataRow("R2toR3")]
+		[DataRow("R3toR2")]
+		[DataRow("R3toR4")]
+		[DataRow("R4toR3")]
+		[DataRow("R4toR5")]
+		[DataRow("R5toR4")]
+		[DataRow("R4BtoR5")]
+		[DataRow("R5toR4B")]
+		public void ParseAllCrossVersionMaps(string versionMapFolder)
 		{
-			ParseAllMaps("R3toR4");
-		}
-
-		[TestMethod]
-		public void ParseAllR4toR5Maps()
-		{
-			ParseAllMaps("R4toR5");
-		}
-
-		[TestMethod]
-		public void ParseAllR4BtoR5Maps()
-		{
-			ParseAllMaps("R4BtoR5");
-		}
-
-		[TestMethod]
-		public void ParseAllR5toR4BMaps()
-		{
-			ParseAllMaps("R5toR4B");
+			ParseAllMaps(versionMapFolder);
 		}
 
 		[TestMethod]
@@ -495,15 +405,15 @@ namespace Test.FhirMappingLanguage
                 {
                     using (var sr = new StreamReader(stream))
                     {
-                        ISourceNode sourceNode;
-                        var sourceText = sr.ReadToEnd();
-                        if (file.Name.EndsWith(".json"))
-                            sourceNode = FhirJsonNode.Parse(sourceText);
-                        else
-                            sourceNode = FhirXmlNode.Parse(sourceText);
-
                         try
                         {
+                            ISourceNode sourceNode;
+                            var sourceText = sr.ReadToEnd();
+                            if (file.Name.EndsWith(".json"))
+                                sourceNode = FhirJsonNode.Parse(sourceText);
+                            else
+                                sourceNode = FhirXmlNode.Parse(sourceText);
+
                             if (!File.Exists($@"{mapFolder}\{sourceNode.Name}.fml"))
                             {
                                 System.Diagnostics.Trace.WriteLine($"Skipping {file.Name} type ({sourceNode.Name}) that has no map");

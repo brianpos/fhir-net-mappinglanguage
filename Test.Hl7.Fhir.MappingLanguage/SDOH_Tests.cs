@@ -71,13 +71,13 @@ namespace Test.FhirMappingLanguage
                 var temp = target.ToJson(new FhirJsonSerializationSettings() { Pretty = true });
                 System.Diagnostics.Trace.WriteLine(temp);
                 output = target.ToPoco() as Resource;
+                var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
+                System.Diagnostics.Trace.WriteLine(xml2);
             }
             catch (System.Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
             }
-            var xml2 = new FhirXmlSerializer(new SerializerSettings() { Pretty = true }).SerializeToString(output);
-            System.Diagnostics.Trace.WriteLine(xml2);
         }
 
         [TestMethod]

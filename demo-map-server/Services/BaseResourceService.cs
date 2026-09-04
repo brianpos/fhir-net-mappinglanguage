@@ -146,7 +146,7 @@ namespace demo_map_server.Services
                                 canonical = null;
                                 return false;
                             });
-                        var mapServices = new InlineServices(outcome, provider);
+                        var mapServices = new InlineServices(outcome, provider, Source);
                         mapServices.DebugMode = operationParameters["debug"]?.Value != null;
                         var engine = new StructureMapUtilitiesExecute(worker, mapServices, provider);
 

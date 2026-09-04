@@ -9,6 +9,7 @@ using Hl7.Fhir.Specification.Source;
 using Hl7.FhirPath;
 using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.IO;
 
 namespace Test.FhirMappingLanguage
 {
@@ -114,7 +115,7 @@ namespace Test.FhirMappingLanguage
 
         private CachedResolver GetSource()
         {
-            var source = new CachedResolver(ZipSource.CreateValidationSource());
+            var source = new CachedResolver(ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip")));
             source.Load += Source_Load;
             return source;
         }

@@ -85,6 +85,12 @@ namespace Hl7.Fhir.MappingLanguage
 		public SourceLocation StartLoc { get; private set; }
 		public SourceLocation EndLoc { get; private set; }
 
+        public string SourceFile { get; set; }
+
+        /// <summary>
+        /// The simplified FHIRPath location of the element in the associated structure map
+        /// </summary>
+        public string Expression { get; set; }
 	}
 
 	public class CommaSeparatedStringBuilder
@@ -219,6 +225,8 @@ namespace Hl7.Fhir.MappingLanguage
             // need to do this extraction from the actual dotnet implementation
             if (functionName == "toDate")
                 return new FunctionDetails("toDate", 0, 0);
+            if (functionName == "toLong")
+                return new FunctionDetails("toLong", 0, 0);
             if (functionName == "split")
                 return new FunctionDetails("split", 1, 1);
             if (functionName == "join")

@@ -987,6 +987,12 @@ namespace Hl7.Fhir.MappingLanguage
             lexer.getFirstComment();
         }
 
+        private string GetFhirPathLocation(IAnnotated s)
+        {
+            var locationExpression = s?.Annotation<DebugAnnotation>()?.Expression;
+            return locationExpression;
+        }
+
         private void parseGroup(StructureMap result, FHIRLexer lexer)
         {
 			var positionAnnotation = DebugAnnotation.Start(lexer);
@@ -996,6 +1002,7 @@ namespace Hl7.Fhir.MappingLanguage
             if (!string.IsNullOrEmpty(comment))
                 group.Documentation = comment;
             result.Group.Add(group);
+            string fhirPathLocation = $"group[{result.Group.Count()}]";
             bool newFmt = false;
             if (lexer.hasToken("for"))
             {
@@ -1270,23 +1277,35 @@ namespace Hl7.Fhir.MappingLanguage
 			var sourceNode = DebugAnnotation.Start(lexer);
 			var source = new StructureMap.SourceComponent();
             rule.Source.Add(source);
-            source.Context = lexer.take();
-            if (source.Context.Equals("search") && lexer.hasToken("("))
-            {
-                source.Context = "@search";
-                lexer.take();
-                ExpressionNode node = fpe.parse(lexer);
-                source.setUserData(MAP_SEARCH_EXPRESSION, node);
-                source.Element = node.ToString();
-                lexer.token(")");
-            }
-            else if (lexer.hasToken("."))
-            {
-                lexer.token(".");
-                source.Element = lexer.take();
-				if (source.Element.StartsWith("`"))
-					source.Element = lexer.processConstant(source.Element);
-				sourceNode.TagEnd(source.ElementElement, lexer);
+            if (lexer.hasToken("("))
+			{
+				source.Context = "@fhirpath";
+				lexer.take();
+				ExpressionNode node = fpe.parse(lexer);
+				source.setUserData(MAP_SEARCH_EXPRESSION, node);
+				source.Element = node.ToString();
+				lexer.token(")");
+			}
+			else
+			{
+				source.Context = lexer.take();
+				if (source.Context.Equals("search") && lexer.hasToken("("))
+				{
+					source.Context = "@search";
+					lexer.take();
+					ExpressionNode node = fpe.parse(lexer);
+					source.setUserData(MAP_SEARCH_EXPRESSION, node);
+					source.Element = node.ToString();
+					lexer.token(")");
+				}
+				else if (lexer.hasToken("."))
+				{
+					lexer.token(".");
+					source.Element = lexer.take();
+					if (source.Element.StartsWith("`"))
+						source.Element = lexer.processConstant(source.Element);
+					sourceNode.TagEnd(source.ElementElement, lexer);
+				}
 			}
 			if (lexer.hasToken(":"))
             {
@@ -1359,7 +1378,7 @@ namespace Hl7.Fhir.MappingLanguage
 			var targetNode = DebugAnnotation.Start(lexer);
 			var target = new StructureMap.TargetComponent();
             rule.Target.Add(target);
-			var targetElementNode = DebugAnnotation.Start(lexer);
+            var targetElementNode = DebugAnnotation.Start(lexer);
 			string start = lexer.take();
             if (lexer.hasToken("."))
             {

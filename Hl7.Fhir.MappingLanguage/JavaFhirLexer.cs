@@ -29,6 +29,8 @@
 
 // Port of https://github.com/hapifhir/org.hl7.fhir.core/blob/master/org.hl7.fhir.r5/src/main/java/org/hl7/fhir/r5/utils/FHIRLexer.java
 
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -52,6 +54,30 @@ namespace Hl7.Fhir.MappingLanguage
             : base(message)
         {
         }
+    }
+
+    public class FHIRMapExecutionException : FHIRException
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="group">Provided to be able to read the source file extension from</param>
+        /// <param name="node"></param>
+        public FHIRMapExecutionException(string message, StructureMap map, IAnnotated node)
+            : base(message)
+        {
+            if (node?.HasAnnotation<DebugAnnotation>() == true)
+            {
+                Location = node.Annotation<DebugAnnotation>();
+                var sourceFile = map?.GetStringExtension("http://hl7.org/fhir/StructureDefinition/operationoutcome-file")
+                    ?? map?.Group?.FirstOrDefault()?.GetStringExtension("http://hl7.org/fhir/StructureDefinition/operationoutcome-file");
+                if (!string.IsNullOrEmpty(sourceFile))
+                    Location.SourceFile = sourceFile;
+            }
+        }
+
+        public DebugAnnotation Location { get; private set; }
     }
 
     public class FHIRLexerException : FHIRException

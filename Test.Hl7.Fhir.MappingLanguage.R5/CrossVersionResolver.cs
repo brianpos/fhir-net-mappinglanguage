@@ -149,7 +149,7 @@ namespace Test.Hl7.Fhir.MappingLanguage
             stu3 = new DirectorySource(Path.Combine(crossVersionPackages, "r3"), settingsDir);
             // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
             // r4 = new DirectorySource(Path.Combine(crossVersionPackages, "r4"), settingsDir);
-            r4 = ZipSource.CreateValidationSource();
+            r4 = ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"));
             r5 = new DirectorySource(Path.Combine(crossVersionPackages, "r5"), settingsDir);
         }
 

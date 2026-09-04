@@ -118,7 +118,7 @@ namespace Test.FhirMappingLanguage
             if (_provider == null)
             {
                 var source = new InMemoryProvider(GenerateStructureDefinition());
-                _provider = new StructureDefinitionSummaryProvider(new CachedResolver(new MultiResolver(source, ZipSource.CreateValidationSource())), source.TypeNameMapper);
+                _provider = new StructureDefinitionSummaryProvider(new CachedResolver(new MultiResolver(source, ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip")))), source.TypeNameMapper);
             }
             // return sn.ToTypedElement();
             return sn.ToTypedElement(_provider, "Entry");

@@ -6,6 +6,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Specification;
 using Hl7.Fhir.Specification.Source;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.IO;
 using System.Xml.Serialization;
 
 namespace Test.FhirMappingLanguage
@@ -23,11 +24,16 @@ namespace Test.FhirMappingLanguage
         {
             var source = new CachedResolver(new MultiResolver(
                 new DirectorySource(@"c:\temp\analyzetests"),
-                ZipSource.CreateValidationSource()
+                GetSource()
                 ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
             return worker;
+        }
+
+        private static ZipSource GetSource()
+        {
+            return ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"));
         }
 
         private static void Source_Load(object sender, CachedResolver.LoadResourceEventArgs e)
@@ -117,7 +123,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step1\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -184,7 +190,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step2\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -234,7 +240,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -286,7 +292,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -336,7 +342,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step3\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -388,7 +394,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step5\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -440,7 +446,7 @@ namespace Test.FhirMappingLanguage
 
             var source = new CachedResolver(new MultiResolver(
                new DirectorySource(@$"{mappingtutorial_folder}\maptutorial\step5\logical"),
-               ZipSource.CreateValidationSource()
+               GetSource()
                ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);

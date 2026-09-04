@@ -8,6 +8,7 @@ using Hl7.Fhir.Specification.Source;
 using Hl7.FhirPath;
 using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.IO;
 
 namespace Test.FhirMappingLanguage
 {
@@ -278,7 +279,7 @@ namespace Test.FhirMappingLanguage
             var expression = System.IO.File.ReadAllText("C:\\Users\\brian\\Downloads\\structuremap-emcarea.registration.p.map");
             var source = new CachedResolver(new MultiResolver(
                 new DirectorySource(@"c:\temp\analyzetests"),
-                ZipSource.CreateValidationSource()
+                ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"))
                 ));
             var parser = new StructureMapUtilitiesParse();
             var sm = parser.parse(expression, null);

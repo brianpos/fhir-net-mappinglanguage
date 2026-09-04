@@ -65,3 +65,16 @@ https://jira.hl7.org/browse/FHIR-39282
 [netsdk-zulip]: https://chat.fhir.org/#narrow/stream/dotnet
 [nvie]: http://nvie.com/posts/a-successful-git-branching-model/
 [fhir-spec]: http://www.hl7.org/fhir/mapping-language.html
+
+
+## Future Enhancements
+* issues annotated with locations from FML and StructureMap
+* Trace items annotated with locations from FML and StructureMap
+* Terminology mapping via translate
+* 
+
+### Reporting issues:
+Extensions:
+http://hl7.org/fhir/StructureDefinition/operationoutcome-file
+http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-line
+http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col

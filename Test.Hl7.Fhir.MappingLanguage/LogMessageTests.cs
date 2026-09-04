@@ -26,9 +26,9 @@ namespace Test.FhirMappingLanguage
             Assert.AreEqual(StructureMapUtilitiesAnalyze.VariableMode.OUTPUT, captured.Mode);
             Assert.AreEqual("target", captured.Name);
             Assert.AreEqual("Patient", captured.Path);
-            StringAssert.Contains(captured.Value, "\"resourceType\":\"Patient\"");
-            StringAssert.Contains(captured.Value, "\"active\":true");
-            Assert.IsFalse(captured.Value.Contains("\"active\":false"));
+            StringAssert.Contains(captured.JsonValue, "\"resourceType\":\"Patient\"");
+            StringAssert.Contains(captured.JsonValue, "\"active\":true");
+            Assert.IsFalse(captured.JsonValue.Contains("\"active\":false"));
         }
     }
 }

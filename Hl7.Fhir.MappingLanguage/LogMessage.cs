@@ -36,57 +36,26 @@ using System.Linq;
 
 namespace Hl7.Fhir.MappingLanguage
 {
-	public record LogMessage
-	{
-		public LogMessage(string message, StructureMapUtilitiesAnalyze.Variables vars, IAnnotated sourceLocation = null)
-		{
-			this.message = message;
-			variables = vars?.All()
-				.Select(variable => new { variable, value = variable.getObject() })
-				.Where(item => item.value != null)
-				.Select(item => new LogMessageVariable(item.variable.Mode, item.variable.Name, GetPath(item.value), item.value.InstanceType, GetValue(item.value)))
-				.ToList() ?? new List<LogMessageVariable>();
+    public record LogMessage
+    {
+        public LogMessage(string message, StructureMapUtilitiesAnalyze.Variables vars, IAnnotated sourceLocation = null)
+        {
+            this.message = message;
 
-			if (sourceLocation?.HasAnnotation<DebugAnnotation>() == true)
-			{
-				debugAnnotation = sourceLocation.Annotation<DebugAnnotation>();
-			}
-		}
+            if (sourceLocation?.HasAnnotation<DebugAnnotation>() == true)
+            {
+                debugAnnotation = sourceLocation.Annotation<DebugAnnotation>();
+            }
 
-		private static string GetPath(ITypedElement value)
-		{
-			if (value is IShortPathGenerator shortPathGenerator)
-				return shortPathGenerator.ShortPath;
-			if (value is FhirJsonNode jsonNode)
-				return jsonNode.Location;
-			return null;
-		}
+            variables = vars?.All()
+                .SelectMany(variable => variable.getObject()
+                    .Where(value => value != null)
+                    .Select(value => new TraceVariable(variable.Mode, variable.Name, value)))
+                .ToList() ?? new List<TraceVariable>();
+        }
 
-		private static string GetValue(ITypedElement value)
-		{
-			return value.Value?.ToString() ?? value.ToJson();
-		}
-
-		public string message;
-		public IReadOnlyList<LogMessageVariable> variables;
-		public DebugAnnotation debugAnnotation;
-	}
-
-	public class LogMessageVariable
-	{
-		public LogMessageVariable(StructureMapUtilitiesAnalyze.VariableMode mode, string name, string path, string type, string value)
-		{
-			Mode = mode;
-			Name = name;
-			Path = path;
-            Type = type;
-			Value = value;
-		}
-
-		public StructureMapUtilitiesAnalyze.VariableMode Mode { get; }
-		public string Name { get; }
-		public string Path { get; }
-        public string Type { get; }
-        public string Value { get; }
-	}
+        public string message;
+        public IReadOnlyList<TraceVariable> variables;
+        public DebugAnnotation debugAnnotation;
+    }
 }

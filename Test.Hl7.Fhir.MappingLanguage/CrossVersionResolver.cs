@@ -130,19 +130,9 @@ namespace Test.Hl7.Fhir.MappingLanguage
             var settingsXml = new FhirXmlParsingSettings() { PermissiveParsing = true };
             var settingsDir = new DirectorySourceSettings() { JsonParserSettings = settingsJson, XmlParserSettings = settingsXml, ParserSettings = { AcceptUnknownMembers = true, PermissiveParsing = true, AllowUnrecognizedEnums = true } };
 
-            string crossVersionPackages = System.IO.Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
-                "FhirMapper");
-            if (!System.IO.Directory.Exists(crossVersionPackages))
-            {
-                System.Diagnostics.Trace.WriteLine($"Cross Version package cache folder does not exist {crossVersionPackages}");
-            }
-
             var cacheBaseDir = Path.Combine(Path.GetTempPath(), BuildDefaultCacheDirectoryNameWithoutSdkVersion());
 
-
-			stu3 = new DirectorySource(System.IO.Path.Combine(crossVersionPackages, "r3"), settingsDir);
-            // stu3.ParserSettings.ExceptionHandler = CustomExceptionHandler;
+            stu3 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.stu3.custom.zip"), cacheBaseDir+ "Hl7.Fhir.STU3-inR4format", settingsDir);
             r4 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4.zip"), cacheBaseDir+ "Hl7.Fhir.R4", settingsDir);
 			r4b = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r4b.zip"), cacheBaseDir + "Hl7.Fhir.R4B", settingsDir);
 			r5 = new ZipSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"), cacheBaseDir + "Hl7.Fhir.R5", settingsDir);

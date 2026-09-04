@@ -25,7 +25,7 @@ namespace Test.FhirMappingLanguage
         {
             var source = new CachedResolver(new MultiResolver(
                 new DirectorySource(@"c:\temp\analyzetests"),
-                ZipSource.CreateValidationSource()
+                ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"))
                 ));
             source.Load += Source_Load;
             var worker = new TestWorker(source);
@@ -255,7 +255,7 @@ namespace Test.FhirMappingLanguage
 				mapLogicalModelTypes.Add(sd.Type, sd.Url);
 
 			}
-			var source = new CachedResolver(new MultiResolver(directorySource, ZipSource.CreateValidationSource()));
+			var source = new CachedResolver(new MultiResolver(directorySource, ZipSource.CreateValidationSource(Path.Combine(CommonDirectorySource.SpecificationDirectory, "specification.r5.zip"))));
 			source.Load += Source_Load;
 			var worker = new TestWorker(source);
 
